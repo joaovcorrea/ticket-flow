@@ -147,6 +147,7 @@ export function KanbanBoard({ initialTickets }: KanbanBoardProps) {
                 key={status}
                 onDragOver={(event) => {
                   event.preventDefault();
+                  event.stopPropagation();
                   setActiveStatus(status);
                 }}
                 onDrop={(event) => {
@@ -157,7 +158,7 @@ export function KanbanBoard({ initialTickets }: KanbanBoardProps) {
                     void moveTicket(ticketId, status);
                   }
                 }}
-                className={`min-h-[360px] rounded-2xl border p-2.5 transition-all ${getColumnTone(status)} ${isActive ? "ring-2 ring-brand-400" : ""}`}
+                className={`min-h-[360px] rounded-2xl border p-2.5 transition-all ${getColumnTone(status)} ${isActive ? "border-brand-400 bg-brand-50/80 ring-2 ring-brand-300" : ""}`}
               >
                 <div className="mb-2.5 flex items-center justify-between rounded-xl border border-white/70 bg-white/70 px-2.5 py-2">
                   <div>
@@ -183,13 +184,14 @@ export function KanbanBoard({ initialTickets }: KanbanBoardProps) {
                           event.dataTransfer.effectAllowed = "move";
                           event.dataTransfer.setData("text/plain", ticket.id);
                           setDraggedTicketId(ticket.id);
+                          setActiveStatus(null);
                         }}
                         onDragEnd={() => {
                           setDraggedTicketId(null);
                           setActiveStatus(null);
                         }}
                         onClick={() => router.push(`/tickets/${ticket.id}`)}
-                        className="cursor-grab rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        className={`cursor-grab rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${updatingId === ticket.id ? "opacity-70" : ""}`}
                       >
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <div>
