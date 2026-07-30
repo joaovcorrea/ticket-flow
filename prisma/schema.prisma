@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  AGENT
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketSource {
+  WHATSAPP
+  WEB
+  EMAIL
+  PHONE
+}
+
+enum SlaStatus {
+  ON_TRACK
+  AT_RISK
+  BREACHED
+  MET
+}
+
+enum PointReason {
+  TICKET_RESOLVED
+  SLA_MET
+  FIRST_RESPONSE
+  CUSTOMER_SATISFACTION
+  BONUS
+  PENALTY
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#3B82F6")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agents      Agent[]
+  tickets     Ticket[]
+  slaPolicies SlaPolicy[]
+}
+
+model Agent {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(AGENT)
+  avatar       String?
+  isActive     Boolean  @default(true)
+  totalPoints  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  assignedTickets Ticket[]       @relation("AssignedAgent")
+  messages        TicketMessage[]
+  pointLogs       AgentPointLog[]
+  activities      TicketActivity[]
+}
+
+model SlaPolicy {
+  id                   String         @id @default(cuid())
+  name                 String
+  priority             TicketPriority
+  firstResponseMinutes Int
+  resolutionMinutes    Int
+  isActive             Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  @@unique([departmentId, priority])
+}
+
+model Ticket {
+  id              String         @id @default(cuid())
+  ticketNumber    Int            @unique
+  subject         String
+  description     String
+  status          TicketStatus   @default(OPEN)
+  priority        TicketPriority @default(MEDIUM)
+  source          TicketSource   @default(WHATSAPP)
+  slaStatus       SlaStatus      @default(ON_TRACK)
+
+  requesterName   String
+  requesterPhone  String?
+  requesterEmail  String?
+
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  slaDueAt        DateTime?
+  firstResponseDueAt DateTime?
+
+  whatsappChatId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id])
+  assignedAgentId String?
+  assignedAgent  Agent?      @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+
+  messages   TicketMessage[]
+  activities TicketActivity[]
+  tags       TicketTag[]
+}
+
+model TicketMessage {
+  id         String   @id @default(cuid())
+  content    String
+  isInternal Boolean  @default(false)
+  isFromAgent Boolean @default(false)
+  whatsappMessageId String?
+  createdAt  DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agentId  String?
+  agent    Agent? @relation(fields: [agentId], references: [id])
+}
+
+model TicketActivity {
+  id        String   @id @default(cuid())
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agentId  String?
+  agent    Agent? @relation(fields: [agentId], references: [id])
+}
+
+model TicketTag {
+  id   String @id @default(cuid())
+  name String
+
+  tickets Ticket[]
+}
+
+model AgentPointLog {
+  id        String      @id @default(cuid())
+  points    Int
+  reason    PointReason
+  note      String?
+  createdAt DateTime    @default(now())
+
+  agentId  String
+  agent    Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  ticketId String?
+}
+
+model WhatsAppSession {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  ticketId  String?
+  lastMessageAt DateTime @default(now())
+  createdAt DateTime @default(now())
+}
