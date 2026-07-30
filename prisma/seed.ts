@@ -5,7 +5,7 @@ import { subHours, subDays } from "date-fns";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding TicketFlow...");
+  console.log("🌱 Seeding Ticket Flow...");
 
   // Departments
   const ti = await prisma.department.create({

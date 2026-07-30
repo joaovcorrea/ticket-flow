@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/ui/card";
 import { Badge, Button } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, ArrowLeft } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, User, Clock3 } from "lucide-react";
 import Link from "next/link";
 
 interface TicketDetail {
@@ -58,6 +58,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [isInternal, setIsInternal] = useState(false);
   const [ticketId, setTicketId] = useState("");
   const [loading, setLoading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -88,6 +89,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     setMessage("");
   }
 
+  function openInternalNote() {
+    setIsInternal(true);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }
+
   if (!ticket) {
     return <div className="flex h-full items-center justify-center p-8 text-slate-400">Carregando...</div>;
   }
@@ -104,50 +110,136 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         />
       </div>
 
+      <Card className="mb-6 border-slate-200 bg-gradient-to-r from-brand-50 via-white to-slate-50">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Badge variant={ticket.priority.toLowerCase()}>{PRIORITY_LABELS[ticket.priority]}</Badge>
+              <Badge variant={ticket.slaStatus.toLowerCase()}>{SLA_LABELS[ticket.slaStatus]}</Badge>
+              <Badge variant={ticket.source.toLowerCase()}>{SOURCE_LABELS[ticket.source]}</Badge>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{ticket.description}</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Departamento</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span className="h-2.5 w-2.5 rounded-full bg-brand-500" />
+                {ticket.department?.name || "Sem departamento"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Responsável</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-medium text-slate-700">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                {ticket.assignedAgent?.name || "Não atribuído"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
-          <Card>
-            <h3 className="mb-2 font-semibold">Descrição</h3>
-            <p className="whitespace-pre-wrap text-sm text-slate-600">{ticket.description}</p>
-          </Card>
-
-          <Card>
-            <h3 className="mb-4 font-semibold">Conversas</h3>
-            <div className="mb-4 max-h-96 space-y-3 overflow-y-auto">
-              {ticket.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`rounded-lg p-3 text-sm ${
-                    msg.isInternal
-                      ? "border border-amber-200 bg-amber-50"
-                      : msg.isFromAgent
-                        ? "ml-8 bg-brand-50"
-                        : "mr-8 bg-slate-100"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                    <span>{msg.isFromAgent ? msg.agent?.name || "Agente" : ticket.requesterName}</span>
-                    <span>{format(new Date(msg.createdAt), "dd/MM HH:mm", { locale: ptBR })}</span>
+          <Card className="overflow-hidden p-0">
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                    <MessageCircle className="h-5 w-5" />
                   </div>
-                  <p>{msg.content}</p>
-                  {msg.isInternal && <span className="mt-1 inline-block text-xs text-amber-600">Nota interna</span>}
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Conversa</h3>
+                    <p className="text-sm text-slate-500">{ticket.messages.length} mensagens · {ticket.requesterName}</p>
+                  </div>
                 </div>
-              ))}
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
+                  {ticket.assignedAgent?.name || "Sem agente"}
+                </div>
+              </div>
             </div>
 
-            <div className="border-t pt-4">
+            <div className="max-h-[540px] space-y-4 overflow-y-auto bg-slate-50/70 p-5">
+              {ticket.messages.length > 0 ? (
+                ticket.messages.map((msg) => {
+                  const isCustomer = !msg.isFromAgent && !msg.isInternal;
+                  const bubbleClass = msg.isInternal
+                    ? "border-amber-200 bg-amber-50"
+                    : msg.isFromAgent
+                      ? "border-brand-200 bg-brand-50"
+                      : "border-slate-200 bg-white";
+
+                  return (
+                    <div key={msg.id} className={`flex ${msg.isFromAgent ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${bubbleClass}`}>
+                        <div className="mb-2 flex items-center gap-2 text-xs">
+                          <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${msg.isFromAgent ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                            <User className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="font-semibold text-slate-700">
+                            {msg.isFromAgent ? msg.agent?.name || "Agente" : ticket.requesterName}
+                          </span>
+                          {msg.isInternal && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                              Interna
+                            </span>
+                          )}
+                          <span className="ml-auto text-[11px] text-slate-400">
+                            {format(new Date(msg.createdAt), "dd/MM HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{msg.content}</p>
+                        {isCustomer && (
+                          <p className="mt-2 text-[11px] uppercase tracking-wide text-slate-400">Cliente</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                  Ainda não há mensagens nesta conversa.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 bg-white p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${!isInternal ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                  onClick={() => setIsInternal(false)}
+                >
+                  Resposta
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${isInternal ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-600"}`}
+                  onClick={() => setIsInternal(true)}
+                >
+                  Nota interna
+                </button>
+                <button
+                  type="button"
+                  onClick={openInternalNote}
+                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  + Nota interna
+                </button>
+              </div>
               <textarea
+                ref={textareaRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Escreva uma resposta..."
+                placeholder={isInternal ? "Escreva uma nota interna..." : "Escreva uma resposta ao cliente..."}
                 rows={3}
-                className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="mb-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-500"
               />
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-500">
-                  <input type="checkbox" checked={isInternal} onChange={(e) => setIsInternal(e.target.checked)} />
-                  Nota interna (não envia ao WhatsApp)
-                </label>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  {isInternal ? "Visível apenas para a equipe" : "Envia para o canal do cliente"}
+                </p>
                 <Button onClick={sendMessage} disabled={loading}>
                   <Send className="mr-1 h-4 w-4" /> Enviar
                 </Button>
@@ -161,11 +253,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             <h3 className="mb-3 font-semibold">Propriedades</h3>
             <div className="space-y-3 text-sm">
               <div>
-                <label className="text-xs text-slate-500">Status</label>
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</label>
                 <select
                   value={ticket.status}
                   onChange={(e) => updateTicket({ status: e.target.value, agentId: agents[0]?.id })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   {Object.entries(STATUS_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -173,11 +265,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500">Prioridade</label>
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Prioridade</label>
                 <select
                   value={ticket.priority}
                   onChange={(e) => updateTicket({ priority: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -185,11 +277,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500">Departamento</label>
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Departamento</label>
                 <select
                   value={ticket.department?.id || ""}
                   onChange={(e) => updateTicket({ departmentId: e.target.value || null })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   <option value="">Sem departamento</option>
                   {departments.map((d) => (
@@ -198,11 +290,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500">Agente responsável</label>
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Agente responsável</label>
                 <select
                   value={ticket.assignedAgent?.id || ""}
                   onChange={(e) => updateTicket({ assignedAgentId: e.target.value || null })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   <option value="">Não atribuído</option>
                   {agents.map((a) => (
@@ -218,18 +310,20 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           </Card>
 
           <Card>
-            <h3 className="mb-3 font-semibold">SLA</h3>
+            <h3 className="mb-3 flex items-center gap-2 font-semibold">
+              <Clock3 className="h-4 w-4 text-brand-600" /> SLA
+            </h3>
             <div className="space-y-2 text-sm">
               {ticket.firstResponseDueAt && (
-                <div>
-                  <p className="text-xs text-slate-500">1ª resposta até</p>
-                  <p>{format(new Date(ticket.firstResponseDueAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">1ª resposta até</p>
+                  <p className="mt-1 text-slate-700">{format(new Date(ticket.firstResponseDueAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                 </div>
               )}
               {ticket.slaDueAt && (
-                <div>
-                  <p className="text-xs text-slate-500">Resolução até</p>
-                  <p>{format(new Date(ticket.slaDueAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Resolução até</p>
+                  <p className="mt-1 text-slate-700">{format(new Date(ticket.slaDueAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                 </div>
               )}
             </div>
@@ -239,9 +333,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             <h3 className="mb-3 font-semibold">Atividades</h3>
             <div className="max-h-48 space-y-2 overflow-y-auto text-xs">
               {ticket.activities.map((act) => (
-                <div key={act.id} className="border-b border-slate-50 pb-2">
-                  <p className="font-medium">{act.action}</p>
-                  <p className="text-slate-500">
+                <div key={act.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <p className="font-medium text-slate-700">{act.action}</p>
+                  <p className="mt-1 text-slate-500">
                     {format(new Date(act.createdAt), "dd/MM HH:mm", { locale: ptBR })}
                     {act.agent && ` · ${act.agent.name}`}
                   </p>

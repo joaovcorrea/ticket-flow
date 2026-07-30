@@ -6,6 +6,7 @@ const schema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   color: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -21,6 +22,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const data = schema.parse(await request.json());
-  const department = await prisma.department.create({ data });
+  const department = await prisma.department.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      color: data.color || "#3B82F6",
+      isActive: data.isActive ?? true,
+    },
+  });
   return NextResponse.json(department, { status: 201 });
 }

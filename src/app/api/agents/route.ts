@@ -9,6 +9,7 @@ const schema = z.object({
   password: z.string().min(6).optional(),
   role: z.enum(["ADMIN", "SUPERVISOR", "AGENT"]).default("AGENT"),
   departmentId: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
       passwordHash,
       role: data.role,
       departmentId: data.departmentId,
+      isActive: data.isActive ?? true,
     },
     include: { department: true },
   });

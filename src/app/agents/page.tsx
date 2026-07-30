@@ -3,18 +3,25 @@ import { PageHeader, Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS, POINT_REASON_LABELS } from "@/lib/utils";
 import { Trophy, Star } from "lucide-react";
+import { CreateAgentForm } from "@/components/admin/create-agent-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
-  const agents = await prisma.agent.findMany({
-    include: {
-      department: true,
-      pointLogs: { orderBy: { createdAt: "desc" }, take: 5 },
-      _count: { select: { assignedTickets: true } },
-    },
-    orderBy: { totalPoints: "desc" },
-  });
+  const [agents, departments] = await Promise.all([
+    prisma.agent.findMany({
+      include: {
+        department: true,
+        pointLogs: { orderBy: { createdAt: "desc" }, take: 5 },
+        _count: { select: { assignedTickets: true } },
+      },
+      orderBy: { totalPoints: "desc" },
+    }),
+    prisma.department.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <div className="p-8">
@@ -22,6 +29,8 @@ export default async function AgentsPage() {
         title="Agentes"
         description="Equipe de suporte e ranking de pontos"
       />
+
+      <CreateAgentForm departments={departments} />
 
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
         {agents.slice(0, 3).map((agent, i) => (

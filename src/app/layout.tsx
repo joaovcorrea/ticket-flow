@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TicketFlow — Plataforma de Suporte",
+  title: "Ticket Flow — Plataforma de Suporte",
   description: "Sistema de tickets interno com integração WhatsApp, SLA e gamificação",
 };
 
