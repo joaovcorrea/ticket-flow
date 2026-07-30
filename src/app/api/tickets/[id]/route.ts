@@ -54,6 +54,8 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Ticket não encontrado" }, { status: 404 });
 
   const updateData: Record<string, unknown> = {};
+  const auditChanges: string[] = [];
+
   if (data.subject) updateData.subject = data.subject;
   if (data.description) updateData.description = data.description;
   if (data.status) {
@@ -64,13 +66,21 @@ export async function PATCH(
     if (data.status === "CLOSED" && !existing.closedAt) {
       updateData.closedAt = new Date();
     }
+    auditChanges.push(`status:${data.status}`);
   }
   if (data.priority && data.priority !== existing.priority) {
     updateData.priority = data.priority;
     await applySlaToTicket(id, data.priority, data.departmentId ?? existing.departmentId);
+    auditChanges.push(`priority:${data.priority}`);
   }
-  if (data.departmentId !== undefined) updateData.departmentId = data.departmentId;
-  if (data.assignedAgentId !== undefined) updateData.assignedAgentId = data.assignedAgentId;
+  if (data.departmentId !== undefined && data.departmentId !== existing.departmentId) {
+    updateData.departmentId = data.departmentId;
+    auditChanges.push(`department:${data.departmentId || "none"}`);
+  }
+  if (data.assignedAgentId !== undefined && data.assignedAgentId !== existing.assignedAgentId) {
+    updateData.assignedAgentId = data.assignedAgentId;
+    auditChanges.push(`agent:${data.assignedAgentId || "none"}`);
+  }
 
   const ticket = await prisma.ticket.update({
     where: { id },
@@ -90,6 +100,15 @@ export async function PATCH(
         isFromAgent: true,
         isInternal: data.isInternal ?? false,
         agentId: data.agentId,
+      },
+    });
+
+    await prisma.ticketActivity.create({
+      data: {
+        ticketId: id,
+        agentId: data.agentId,
+        action: data.isInternal ? "Nota Interna Adicionada" : "Resposta Enviada",
+        details: data.message,
       },
     });
 
@@ -115,13 +134,13 @@ export async function PATCH(
     }
   }
 
-  if (data.status || data.assignedAgentId !== undefined) {
+  if (auditChanges.length > 0) {
     await prisma.ticketActivity.create({
       data: {
         ticketId: id,
         agentId: data.agentId,
-        action: "Ticket Atualizado",
-        details: JSON.stringify({ status: data.status, assignedAgentId: data.assignedAgentId }),
+        action: "Auditoria de Ticket",
+        details: JSON.stringify({ changes: auditChanges }),
       },
     });
   }

@@ -13,6 +13,9 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  UserCircle2,
+  PlusCircle,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,7 @@ const nav = [
   { href: "/agents", label: "Agentes", icon: Users },
   { href: "/sla", label: "SLA", icon: Clock },
   { href: "/reports", label: "Relatórios", icon: BarChart3 },
+  { href: "/account", label: "Minha conta", icon: UserCircle2 },
 ];
 
 export function Sidebar() {
@@ -33,7 +37,9 @@ export function Sidebar() {
     <aside className={cn("flex flex-col bg-sidebar text-white transition-all duration-200", collapsed ? "w-20" : "w-64")}>
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
         <div className={cn("flex items-center gap-2", collapsed && "justify-center")}> 
-          <MessageCircle className="h-7 w-7 text-brand-500" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600/20 text-brand-400">
+            <MessageCircle className="h-5 w-5" />
+          </div>
           {!collapsed && (
             <div>
               <h1 className="text-lg font-bold tracking-tight">Ticket Flow</h1>
@@ -76,6 +82,23 @@ export function Sidebar() {
 
       {!collapsed && (
         <div className="border-t border-white/10 p-4">
+          <div className="mb-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-brand-400" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Ações rápidas</p>
+            </div>
+            <div className="space-y-2">
+              <Link href="/tickets/new" className="flex items-center gap-2 rounded-lg bg-brand-600/20 px-2.5 py-2 text-sm text-slate-100 transition-colors hover:bg-brand-600/30">
+                <PlusCircle className="h-4 w-4" />
+                Novo ticket
+              </Link>
+              <Link href="/agents" className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition-colors hover:bg-white/10 hover:text-white">
+                <Users className="h-4 w-4" />
+                Cadastrar agente
+              </Link>
+            </div>
+          </div>
+
           <div className="rounded-lg bg-white/5 p-3">
             <p className="text-xs font-medium text-slate-300">WhatsApp conectado</p>
             <p className="mt-1 text-xs text-slate-500">Webhook: /api/webhooks/whatsapp</p>

@@ -14,8 +14,8 @@ import {
 import { format, startOfDay, eachDayOfInterval, subDays } from "date-fns";
 
 interface TimelineItem {
-  createdAt: string;
-  resolvedAt: string | null;
+  createdAt: string | Date;
+  resolvedAt: string | Date | null;
   status: string;
 }
 

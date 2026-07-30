@@ -113,7 +113,14 @@ export async function getReportData(days = 30) {
         where: { createdAt: { gte: since } },
         select: { createdAt: true, resolvedAt: true, status: true },
         orderBy: { createdAt: "asc" },
-      }),
+      }).then((items) =>
+        items.map((item) => ({
+          ...item,
+          createdAt: item.createdAt.toISOString(),
+          resolvedAt: item.resolvedAt ? item.resolvedAt.toISOString() : null,
+          status: item.status,
+        }))
+      ),
     ]);
 
   return {
