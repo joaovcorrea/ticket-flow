@@ -3,31 +3,31 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const schema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  isActive: z.boolean().optional(),
+  nome: z.string().min(1),
+  descricao: z.string().optional(),
+  cor: z.string().optional(),
+  ativo: z.boolean().optional(),
 });
 
 export async function GET() {
-  const departments = await prisma.department.findMany({
+  const departments = await prisma.departamento.findMany({
     include: {
-      _count: { select: { agents: true, tickets: true } },
-      slaPolicies: true,
+      _count: { select: { atendentes: true, chamados: true } },
+      politicasSla: true,
     },
-    orderBy: { name: "asc" },
+    orderBy: { nome: "asc" },
   });
   return NextResponse.json(departments);
 }
 
 export async function POST(request: NextRequest) {
   const data = schema.parse(await request.json());
-  const department = await prisma.department.create({
+  const department = await prisma.departamento.create({
     data: {
-      name: data.name,
-      description: data.description,
-      color: data.color || "#3B82F6",
-      isActive: data.isActive ?? true,
+      nome: data.nome,
+      descricao: data.descricao,
+      cor: data.cor || "#3B82F6",
+      ativo: data.ativo ?? true,
     },
   });
   return NextResponse.json(department, { status: 201 });

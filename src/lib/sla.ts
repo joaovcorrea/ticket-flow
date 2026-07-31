@@ -1,118 +1,115 @@
-import { TicketPriority, SlaStatus, PointReason } from "@prisma/client";
+import { PrioridadeChamado, StatusSla, MotivoPontos } from "@prisma/client";
 import { prisma } from "./prisma";
 import { addMinutes, isBefore } from "date-fns";
 
 export async function getSlaPolicy(
-  priority: TicketPriority,
-  departmentId?: string | null
+  prioridade: PrioridadeChamado,
+  idDepartamento?: number | null
 ) {
-  if (departmentId) {
-    const deptPolicy = await prisma.slaPolicy.findUnique({
-      where: { departmentId_priority: { departmentId, priority } },
+  if (idDepartamento) {
+    const deptPolicy = await prisma.politicaSla.findUnique({
+      where: { idDepartamento_prioridade: { idDepartamento, prioridade } },
     });
     if (deptPolicy) return deptPolicy;
   }
 
-  return prisma.slaPolicy.findFirst({
-    where: { departmentId: null, priority, isActive: true },
+  return prisma.politicaSla.findFirst({
+    where: { idDepartamento: null, prioridade, ativo: true },
   });
 }
 
 export async function applySlaToTicket(
-  ticketId: string,
-  priority: TicketPriority,
-  departmentId?: string | null
+  idChamado: number,
+  prioridade: PrioridadeChamado,
+  idDepartamento?: number | null
 ) {
-  const policy = await getSlaPolicy(priority, departmentId);
+  const policy = await getSlaPolicy(prioridade, idDepartamento);
   if (!policy) return;
 
   const now = new Date();
-  await prisma.ticket.update({
-    where: { id: ticketId },
+  await prisma.chamado.update({
+    where: { id: idChamado },
     data: {
-      firstResponseDueAt: addMinutes(now, policy.firstResponseMinutes),
-      slaDueAt: addMinutes(now, policy.resolutionMinutes),
-      slaStatus: SlaStatus.ON_TRACK,
+      primeiraRespostaVencimentoEm: addMinutes(now, policy.minutosPrimeiraResposta),
+      slaVencimentoEm: addMinutes(now, policy.minutosResolucao),
+      statusSla: StatusSla.NO_PRAZO,
     },
   });
 }
 
 export function computeSlaStatus(
-  slaDueAt: Date | null,
-  resolvedAt: Date | null,
-  currentStatus: SlaStatus
-): SlaStatus {
-  if (resolvedAt && slaDueAt) {
-    return isBefore(resolvedAt, slaDueAt) ? SlaStatus.MET : SlaStatus.BREACHED;
+  slaVencimentoEm: Date | null,
+  resolvidoEm: Date | null,
+  statusSlaAtual: StatusSla
+): StatusSla {
+  if (resolvidoEm && slaVencimentoEm) {
+    return isBefore(resolvidoEm, slaVencimentoEm) ? StatusSla.CUMPRIDO : StatusSla.ESTOURADO;
   }
-  if (!slaDueAt) return currentStatus;
+  if (!slaVencimentoEm) return statusSlaAtual;
 
   const now = new Date();
-  if (isBefore(now, slaDueAt)) {
-    const remaining = slaDueAt.getTime() - now.getTime();
-    const total = slaDueAt.getTime() - (slaDueAt.getTime() - remaining);
+  if (isBefore(now, slaVencimentoEm)) {
+    const remaining = slaVencimentoEm.getTime() - now.getTime();
+    const total = slaVencimentoEm.getTime() - (slaVencimentoEm.getTime() - remaining);
     const percentRemaining = remaining / (total || 1);
-    return percentRemaining < 0.25 ? SlaStatus.AT_RISK : SlaStatus.ON_TRACK;
+    return percentRemaining < 0.25 ? StatusSla.EM_RISCO : StatusSla.NO_PRAZO;
   }
-  return SlaStatus.BREACHED;
+  return StatusSla.ESTOURADO;
 }
 
 export async function awardPoints(
-  agentId: string,
-  points: number,
-  reason: PointReason,
-  ticketId?: string,
-  note?: string
+  idAgente: number,
+  pontos: number,
+  motivo: MotivoPontos,
+  idChamado?: number,
+  observacao?: string
 ) {
   await prisma.$transaction([
-    prisma.agentPointLog.create({
-      data: { agentId, points, reason, ticketId, note },
+    prisma.registroPontos.create({
+      data: { idAgente, pontos, motivo, idChamado, observacao },
     }),
-    prisma.agent.update({
-      where: { id: agentId },
-      data: { totalPoints: { increment: points } },
+    prisma.atendente.update({
+      where: { id: idAgente },
+      data: { pontosTotais: { increment: pontos } },
     }),
   ]);
 }
 
-export const POINT_VALUES: Record<PointReason, number> = {
-  TICKET_RESOLVED: 10,
-  SLA_MET: 5,
-  FIRST_RESPONSE: 3,
-  CUSTOMER_SATISFACTION: 8,
+export const POINT_VALUES: Record<MotivoPontos, number> = {
+  CHAMADO_RESOLVIDO: 10,
+  SLA_CUMPRIDO: 5,
+  PRIMEIRA_RESPOSTA: 3,
+  SATISFACAO_CLIENTE: 8,
   BONUS: 0,
-  PENALTY: 0,
+  PENALIDADE: 0,
 };
 
-export async function processTicketResolution(ticketId: string, agentId: string) {
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-  if (!ticket || !ticket.resolvedAt) return;
+export async function processTicketResolution(idChamado: number, idAgente: number) {
+  const chamado = await prisma.chamado.findUnique({ where: { id: idChamado } });
+  if (!chamado || !chamado.resolvidoEm) return;
 
   await awardPoints(
-    agentId,
-    POINT_VALUES.TICKET_RESOLVED,
-    PointReason.TICKET_RESOLVED,
-    ticketId
+    idAgente,
+    POINT_VALUES.CHAMADO_RESOLVIDO,
+    MotivoPontos.CHAMADO_RESOLVIDO,
+    idChamado
   );
 
-  if (
-    ticket.slaDueAt &&
-    isBefore(ticket.resolvedAt, ticket.slaDueAt)
-  ) {
+  if (chamado.slaVencimentoEm && isBefore(chamado.resolvidoEm, chamado.slaVencimentoEm)) {
     await awardPoints(
-      agentId,
-      POINT_VALUES.SLA_MET,
-      PointReason.SLA_MET,
-      ticketId
+      idAgente,
+      POINT_VALUES.SLA_CUMPRIDO,
+      MotivoPontos.SLA_CUMPRIDO,
+      idChamado
     );
-    await prisma.ticket.update({
-      where: { id: ticketId },
-      data: { slaStatus: SlaStatus.MET },
+    await prisma.chamado.update({
+      where: { id: idChamado },
+      data: { statusSla: StatusSla.CUMPRIDO },
     });
-  } else if (ticket.slaDueAt) {
-    await prisma.ticket.update({
-      where: { id: ticketId },
-      data: { slaStatus: SlaStatus.BREACHED },
+  } else if (chamado.slaVencimentoEm) {
+    await prisma.chamado.update({
+      where: { id: idChamado },
+      data: { statusSla: StatusSla.ESTOURADO },
     });
   }
 }

@@ -1,38 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PRIORITY_LABELS, formatDuration } from "@/lib/utils";
+import { PRIORITY_LABELS, formatDuration, enumVariant } from "@/lib/utils";
 import { Clock3, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { subDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
 export default async function SlaPage() {
-  const policies = await prisma.slaPolicy.findMany({
-    include: { department: true },
-    orderBy: [{ departmentId: "asc" }, { priority: "asc" }],
+  const policies = await prisma.politicaSla.findMany({
+    include: { departamento: true },
+    orderBy: [{ idDepartamento: "asc" }, { prioridade: "asc" }],
   });
 
-  const globalPolicies = policies.filter((p) => !p.departmentId);
-  const deptPolicies = policies.filter((p) => p.departmentId);
+  const globalPolicies = policies.filter((p) => !p.idDepartamento);
+  const deptPolicies = policies.filter((p) => p.idDepartamento);
 
   const since = subDays(new Date(), 30);
-  const departments = await prisma.department.findMany({
-    orderBy: { name: "asc" },
+  const departments = await prisma.departamento.findMany({
+    orderBy: { nome: "asc" },
   });
 
-  const resolvedTickets = await prisma.ticket.findMany({
+  const resolvedTickets = await prisma.chamado.findMany({
     where: {
-      resolvedAt: { gte: since },
-      departmentId: { not: null },
+      resolvidoEm: { gte: since },
+      idDepartamento: { not: null },
     },
   });
 
   const deptMetrics = departments.map((department) => {
-    const tickets = resolvedTickets.filter((ticket) => ticket.departmentId === department.id);
+    const tickets = resolvedTickets.filter((ticket) => ticket.idDepartamento === department.id);
     const total = tickets.length;
-    const met = tickets.filter((ticket) => ticket.slaStatus === "MET").length;
-    const breached = tickets.filter((ticket) => ticket.slaStatus === "BREACHED").length;
+    const met = tickets.filter((ticket) => ticket.statusSla === "CUMPRIDO").length;
+    const breached = tickets.filter((ticket) => ticket.statusSla === "ESTOURADO").length;
     const compliance = total > 0 ? Math.round((met / total) * 100) : 100;
 
     return { ...department, total, met, breached, compliance };
@@ -90,13 +90,13 @@ export default async function SlaPage() {
               {globalPolicies.map((p) => (
                 <tr key={p.id} className="border-b border-slate-50">
                   <td className="py-3 pr-4">
-                    <Badge variant={p.priority.toLowerCase()}>{PRIORITY_LABELS[p.priority]}</Badge>
+                    <Badge variant={enumVariant(p.prioridade)}>{PRIORITY_LABELS[p.prioridade]}</Badge>
                   </td>
-                  <td className="py-3 pr-4">{formatDuration(p.firstResponseMinutes)}</td>
-                  <td className="py-3 pr-4">{formatDuration(p.resolutionMinutes)}</td>
+                  <td className="py-3 pr-4">{formatDuration(p.minutosPrimeiraResposta)}</td>
+                  <td className="py-3 pr-4">{formatDuration(p.minutosResolucao)}</td>
                   <td className="py-3">
-                    <Badge variant={p.isActive ? "resolved" : "closed"}>
-                      {p.isActive ? "Ativo" : "Inativo"}
+                    <Badge variant={p.ativo ? "resolvido" : "fechado"}>
+                      {p.ativo ? "Ativo" : "Inativo"}
                     </Badge>
                   </td>
                 </tr>
@@ -122,15 +122,15 @@ export default async function SlaPage() {
               </thead>
               <tbody>
                 {deptPolicies.map((p) => {
-                  const metric = deptMetrics.find((item) => item.id === p.departmentId);
+                  const metric = deptMetrics.find((item) => item.id === p.idDepartamento);
                   return (
                     <tr key={p.id} className="border-b border-slate-50">
-                      <td className="py-3 pr-4">{p.department?.name}</td>
+                      <td className="py-3 pr-4">{p.departamento?.nome}</td>
                       <td className="py-3 pr-4">
-                        <Badge variant={p.priority.toLowerCase()}>{PRIORITY_LABELS[p.priority]}</Badge>
+                        <Badge variant={enumVariant(p.prioridade)}>{PRIORITY_LABELS[p.prioridade]}</Badge>
                       </td>
-                      <td className="py-3 pr-4">{formatDuration(p.firstResponseMinutes)}</td>
-                      <td className="py-3">{formatDuration(p.resolutionMinutes)}</td>
+                      <td className="py-3 pr-4">{formatDuration(p.minutosPrimeiraResposta)}</td>
+                      <td className="py-3">{formatDuration(p.minutosResolucao)}</td>
                       <td className="py-3">
                         {metric ? (
                           <div className="flex items-center gap-2">

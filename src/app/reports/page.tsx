@@ -1,7 +1,7 @@
 import { getReportData } from "@/lib/analytics";
 import { PageHeader, Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PRIORITY_LABELS, SOURCE_LABELS } from "@/lib/utils";
+import { PRIORITY_LABELS, SOURCE_LABELS, enumVariant } from "@/lib/utils";
 import { ReportsChart } from "@/components/reports/chart";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +10,12 @@ export default async function ReportsPage() {
   const data = await getReportData(30);
 
   const totalResolved = data.resolvedByDepartment.reduce(
-    (acc, d) => acc + d.tickets.length,
+    (acc, d) => acc + d.chamados.length,
     0
   );
 
   const slaMetCount = data.resolvedByDepartment.reduce(
-    (acc, d) => acc + d.tickets.filter((t) => t.slaStatus === "MET").length,
+    (acc, d) => acc + d.chamados.filter((t) => t.statusSla === "CUMPRIDO").length,
     0
   );
 
@@ -52,17 +52,17 @@ export default async function ReportsPage() {
           <h2 className="mb-4 text-lg font-semibold">Resolvidos por agente</h2>
           <div className="space-y-3">
             {data.resolvedByAgent
-              .filter((a) => a.assignedTickets.length > 0)
+              .filter((a) => a.chamadosAtribuidos.length > 0)
               .slice(0, 10)
               .map((agent) => (
                 <div key={agent.id} className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium">{agent.name}</p>
-                    <p className="text-xs text-slate-500">{agent.department?.name}</p>
+                    <p className="text-sm font-medium">{agent.nome}</p>
+                    <p className="text-xs text-slate-500">{agent.departamento?.nome}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-brand-600">{agent.assignedTickets.length}</p>
-                    <p className="text-xs text-slate-500">{agent.totalPoints} pts</p>
+                    <p className="font-bold text-brand-600">{agent.chamadosAtribuidos.length}</p>
+                    <p className="text-xs text-slate-500">{agent.pontosTotais} pts</p>
                   </div>
                 </div>
               ))}
@@ -73,15 +73,15 @@ export default async function ReportsPage() {
           <h2 className="mb-4 text-lg font-semibold">Resolvidos por departamento</h2>
           <div className="space-y-3">
             {data.resolvedByDepartment.map((dept) => {
-              const met = dept.tickets.filter((t) => t.slaStatus === "MET").length;
+              const met = dept.chamados.filter((t) => t.statusSla === "CUMPRIDO").length;
               return (
                 <div key={dept.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: dept.color }} />
-                    <span className="text-sm font-medium">{dept.name}</span>
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: dept.cor }} />
+                    <span className="text-sm font-medium">{dept.nome}</span>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold">{dept.tickets.length} resolvidos</p>
+                    <p className="font-bold">{dept.chamados.length} resolvidos</p>
                     <p className="text-xs text-emerald-600">{met} com SLA ok</p>
                   </div>
                 </div>
@@ -96,8 +96,8 @@ export default async function ReportsPage() {
           <h2 className="mb-4 text-lg font-semibold">Por prioridade</h2>
           <div className="flex flex-wrap gap-3">
             {data.byPriority.map((p) => (
-              <div key={p.priority} className="rounded-lg bg-slate-50 px-4 py-3 text-center">
-                <Badge variant={p.priority.toLowerCase()}>{PRIORITY_LABELS[p.priority]}</Badge>
+              <div key={p.prioridade} className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+                <Badge variant={enumVariant(p.prioridade)}>{PRIORITY_LABELS[p.prioridade]}</Badge>
                 <p className="mt-2 text-2xl font-bold">{p._count.id}</p>
               </div>
             ))}
@@ -108,8 +108,8 @@ export default async function ReportsPage() {
           <h2 className="mb-4 text-lg font-semibold">Por origem (canal)</h2>
           <div className="flex flex-wrap gap-3">
             {data.bySource.map((s) => (
-              <div key={s.source} className="rounded-lg bg-slate-50 px-4 py-3 text-center">
-                <Badge variant={s.source.toLowerCase()}>{SOURCE_LABELS[s.source]}</Badge>
+              <div key={s.origem} className="rounded-lg bg-slate-50 px-4 py-3 text-center">
+                <Badge variant={enumVariant(s.origem)}>{SOURCE_LABELS[s.origem]}</Badge>
                 <p className="mt-2 text-2xl font-bold">{s._count.id}</p>
               </div>
             ))}

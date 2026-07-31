@@ -3,29 +3,30 @@ import { PageHeader, Card, StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Clock3, Ticket, Users } from "lucide-react";
 import { CreateDepartmentForm } from "@/components/admin/create-department-form";
+import { enumVariant } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DepartmentsPage() {
-  const departments = await prisma.department.findMany({
+  const departments = await prisma.departamento.findMany({
     include: {
-      agents: { where: { isActive: true } },
-      slaPolicies: true,
-      _count: { select: { tickets: true } },
+      atendentes: { where: { ativo: true } },
+      politicasSla: true,
+      _count: { select: { chamados: true } },
     },
-    orderBy: { name: "asc" },
+    orderBy: { nome: "asc" },
   });
 
-  const activeDepartments = departments.filter((dept) => dept.isActive).length;
-  const totalAgents = departments.reduce((sum, dept) => sum + dept.agents.length, 0);
-  const totalTickets = departments.reduce((sum, dept) => sum + dept._count.tickets, 0);
+  const activeDepartments = departments.filter((dept) => dept.ativo).length;
+  const totalAgents = departments.reduce((sum, dept) => sum + dept.atendentes.length, 0);
+  const totalTickets = departments.reduce((sum, dept) => sum + dept._count.chamados, 0);
 
   return (
     <div className="p-8">
       <PageHeader
         title="Departamentos"
         description="Organize equipes, filas de atendimento e políticas de SLA"
-        action={<Badge variant="resolved">Operação ativa</Badge>}
+        action={<Badge variant="resolvido">Operação ativa</Badge>}
       />
 
       <CreateDepartmentForm />
@@ -51,7 +52,7 @@ export default async function DepartmentsPage() {
         />
         <StatCard
           title="SLA ativo"
-          value={departments.reduce((sum, dept) => sum + dept.slaPolicies.filter((policy) => policy.isActive).length, 0)}
+          value={departments.reduce((sum, dept) => sum + dept.politicasSla.filter((policy) => policy.ativo).length, 0)}
           subtitle="Políticas configuradas"
           icon={<Clock3 className="h-5 w-5" />}
         />
@@ -67,23 +68,23 @@ export default async function DepartmentsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {departments.map((dept) => (
-            <Card key={dept.id} className={!dept.isActive ? "border-slate-300 bg-slate-50/70" : ""}>
+            <Card key={dept.id} className={!dept.ativo ? "border-slate-300 bg-slate-50/70" : ""}>
               <div className="mb-3 flex items-center gap-3">
-                <span className="h-4 w-4 rounded-full" style={{ backgroundColor: dept.color }} />
-                <h3 className="text-lg font-semibold">{dept.name}</h3>
-                {!dept.isActive ? <Badge variant="closed">Inativo</Badge> : <Badge variant="resolved">Ativo</Badge>}
+                <span className="h-4 w-4 rounded-full" style={{ backgroundColor: dept.cor }} />
+                <h3 className="text-lg font-semibold">{dept.nome}</h3>
+                {!dept.ativo ? <Badge variant="fechado">Inativo</Badge> : <Badge variant="resolvido">Ativo</Badge>}
               </div>
-              {dept.description && (
-                <p className="mb-4 text-sm text-slate-500">{dept.description}</p>
+              {dept.descricao && (
+                <p className="mb-4 text-sm text-slate-500">{dept.descricao}</p>
               )}
 
               <div className="mb-4 grid grid-cols-2 gap-3 text-center">
                 <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-2xl font-bold text-brand-600">{dept.agents.length}</p>
+                  <p className="text-2xl font-bold text-brand-600">{dept.atendentes.length}</p>
                   <p className="text-xs text-slate-500">Agentes</p>
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-2xl font-bold text-brand-600">{dept._count.tickets}</p>
+                  <p className="text-2xl font-bold text-brand-600">{dept._count.chamados}</p>
                   <p className="text-xs text-slate-500">Tickets</p>
                 </div>
               </div>
@@ -91,12 +92,12 @@ export default async function DepartmentsPage() {
               <div>
                 <p className="mb-2 text-xs font-medium text-slate-500">Políticas SLA</p>
                 <div className="flex flex-wrap gap-1">
-                  {dept.slaPolicies.map((p) => (
-                    <Badge key={p.id} variant={p.priority.toLowerCase()}>
-                      {p.priority}: {p.resolutionMinutes}min
+                  {dept.politicasSla.map((p) => (
+                    <Badge key={p.id} variant={enumVariant(p.prioridade)}>
+                      {p.prioridade}: {p.minutosResolucao}min
                     </Badge>
                   ))}
-                  {dept.slaPolicies.length === 0 && (
+                  {dept.politicasSla.length === 0 && (
                     <span className="text-xs text-slate-400">Usando SLA global</span>
                   )}
                 </div>
@@ -105,10 +106,10 @@ export default async function DepartmentsPage() {
               <div className="mt-4 border-t pt-3">
                 <p className="mb-2 text-xs font-medium text-slate-500">Equipe</p>
                 <div className="flex flex-wrap gap-2">
-                  {dept.agents.length > 0 ? (
-                    dept.agents.map((a) => (
+                  {dept.atendentes.length > 0 ? (
+                    dept.atendentes.map((a) => (
                       <span key={a.id} className="rounded-full bg-slate-100 px-2 py-1 text-xs">
-                        {a.name}
+                        {a.nome}
                       </span>
                     ))
                   ) : (

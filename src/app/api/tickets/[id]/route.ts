@@ -3,18 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { applySlaToTicket, processTicketResolution, awardPoints, POINT_VALUES } from "@/lib/sla";
 import { sendWhatsAppReply } from "@/lib/whatsapp";
-import { PointReason } from "@prisma/client";
+import { MotivoPontos } from "@prisma/client";
 
 const updateSchema = z.object({
-  subject: z.string().optional(),
-  description: z.string().optional(),
-  status: z.enum(["OPEN", "PENDING", "IN_PROGRESS", "RESOLVED", "CLOSED"]).optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
-  departmentId: z.string().nullable().optional(),
-  assignedAgentId: z.string().nullable().optional(),
-  message: z.string().optional(),
-  agentId: z.string().optional(),
-  isInternal: z.boolean().optional(),
+  assunto: z.string().optional(),
+  descricao: z.string().optional(),
+  status: z.enum(["ABERTO", "PENDENTE", "EM_ANDAMENTO", "RESOLVIDO", "FECHADO"]).optional(),
+  prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
+  idDepartamento: z.coerce.number().nullable().optional(),
+  idAgenteResponsavel: z.coerce.number().nullable().optional(),
+  mensagem: z.string().optional(),
+  idAgente: z.coerce.number().optional(),
+  interno: z.boolean().optional(),
 });
 
 export async function GET(
@@ -22,18 +22,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const ticket = await prisma.ticket.findUnique({
-    where: { id },
+  const ticket = await prisma.chamado.findUnique({
+    where: { id: Number(id) },
     include: {
-      department: true,
-      assignedAgent: true,
-      messages: {
-        include: { agent: true },
-        orderBy: { createdAt: "asc" },
+      departamento: true,
+      atendenteResponsavel: true,
+      mensagens: {
+        include: { atendente: true },
+        orderBy: { criadoEm: "asc" },
       },
-      activities: {
-        include: { agent: true },
-        orderBy: { createdAt: "desc" },
+      historico: {
+        include: { atendente: true },
+        orderBy: { criadoEm: "desc" },
       },
     },
   });
@@ -47,100 +47,101 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const idChamado = Number(id);
   const body = await request.json();
   const data = updateSchema.parse(body);
 
-  const existing = await prisma.ticket.findUnique({ where: { id } });
+  const existing = await prisma.chamado.findUnique({ where: { id: idChamado } });
   if (!existing) return NextResponse.json({ error: "Ticket não encontrado" }, { status: 404 });
 
   const updateData: Record<string, unknown> = {};
   const auditChanges: string[] = [];
 
-  if (data.subject) updateData.subject = data.subject;
-  if (data.description) updateData.description = data.description;
+  if (data.assunto) updateData.assunto = data.assunto;
+  if (data.descricao) updateData.descricao = data.descricao;
   if (data.status) {
     updateData.status = data.status;
-    if (data.status === "RESOLVED" && !existing.resolvedAt) {
-      updateData.resolvedAt = new Date();
+    if (data.status === "RESOLVIDO" && !existing.resolvidoEm) {
+      updateData.resolvidoEm = new Date();
     }
-    if (data.status === "CLOSED" && !existing.closedAt) {
-      updateData.closedAt = new Date();
+    if (data.status === "FECHADO" && !existing.fechadoEm) {
+      updateData.fechadoEm = new Date();
     }
     auditChanges.push(`status:${data.status}`);
   }
-  if (data.priority && data.priority !== existing.priority) {
-    updateData.priority = data.priority;
-    await applySlaToTicket(id, data.priority, data.departmentId ?? existing.departmentId);
-    auditChanges.push(`priority:${data.priority}`);
+  if (data.prioridade && data.prioridade !== existing.prioridade) {
+    updateData.prioridade = data.prioridade;
+    await applySlaToTicket(idChamado, data.prioridade, data.idDepartamento ?? existing.idDepartamento);
+    auditChanges.push(`prioridade:${data.prioridade}`);
   }
-  if (data.departmentId !== undefined && data.departmentId !== existing.departmentId) {
-    updateData.departmentId = data.departmentId;
-    auditChanges.push(`department:${data.departmentId || "none"}`);
+  if (data.idDepartamento !== undefined && data.idDepartamento !== existing.idDepartamento) {
+    updateData.idDepartamento = data.idDepartamento;
+    auditChanges.push(`departamento:${data.idDepartamento || "none"}`);
   }
-  if (data.assignedAgentId !== undefined && data.assignedAgentId !== existing.assignedAgentId) {
-    updateData.assignedAgentId = data.assignedAgentId;
-    auditChanges.push(`agent:${data.assignedAgentId || "none"}`);
+  if (data.idAgenteResponsavel !== undefined && data.idAgenteResponsavel !== existing.idAgenteResponsavel) {
+    updateData.idAgenteResponsavel = data.idAgenteResponsavel;
+    auditChanges.push(`agente:${data.idAgenteResponsavel || "none"}`);
   }
 
-  const ticket = await prisma.ticket.update({
-    where: { id },
+  const ticket = await prisma.chamado.update({
+    where: { id: idChamado },
     data: updateData,
-    include: { department: true, assignedAgent: true },
+    include: { departamento: true, atendenteResponsavel: true },
   });
 
-  if (data.status === "RESOLVED" && data.agentId) {
-    await processTicketResolution(id, data.agentId);
+  if (data.status === "RESOLVIDO" && data.idAgente) {
+    await processTicketResolution(idChamado, data.idAgente);
   }
 
-  if (data.message) {
-    await prisma.ticketMessage.create({
+  if (data.mensagem) {
+    await prisma.mensagemTicket.create({
       data: {
-        ticketId: id,
-        content: data.message,
-        isFromAgent: true,
-        isInternal: data.isInternal ?? false,
-        agentId: data.agentId,
+        idChamado,
+        conteudo: data.mensagem,
+        doAgente: true,
+        interno: data.interno ?? false,
+        idAgente: data.idAgente,
       },
     });
 
-    await prisma.ticketActivity.create({
+    await prisma.ticketHistorico.create({
       data: {
-        ticketId: id,
-        agentId: data.agentId,
-        action: data.isInternal ? "Nota Interna Adicionada" : "Resposta Enviada",
-        details: data.message,
+        idChamado,
+        idAgente: data.idAgente,
+        acao: data.interno ? "Nota Interna Adicionada" : "Resposta Enviada",
+        detalhes: data.mensagem,
       },
     });
 
-    if (!data.isInternal && existing.requesterPhone && data.message) {
+    if (!data.interno && existing.telefoneSolicitante && data.mensagem) {
       try {
-        await sendWhatsAppReply(existing.requesterPhone, data.message);
+        await sendWhatsAppReply(existing.telefoneSolicitante, data.mensagem);
       } catch (e) {
         console.error("[WhatsApp] Falha ao enviar resposta:", e);
       }
     }
 
-    if (data.agentId && !existing.firstResponseAt) {
-      await prisma.ticket.update({
-        where: { id },
-        data: { firstResponseAt: new Date() },
+    if (data.idAgente && !existing.primeiraRespostaEm) {
+      await prisma.chamado.update({
+        where: { id: idChamado },
+        data: { primeiraRespostaEm: new Date() },
       });
       await awardPoints(
-        data.agentId,
-        POINT_VALUES.FIRST_RESPONSE,
-        PointReason.FIRST_RESPONSE,
-        id
+        data.idAgente,
+        POINT_VALUES.PRIMEIRA_RESPOSTA,
+        MotivoPontos.PRIMEIRA_RESPOSTA,
+        idChamado
       );
     }
   }
 
   if (auditChanges.length > 0) {
-    await prisma.ticketActivity.create({
+    await prisma.ticketHistorico.create({
       data: {
-        ticketId: id,
-        agentId: data.agentId,
-        action: "Auditoria de Ticket",
-        details: JSON.stringify({ changes: auditChanges }),
+        idChamado,
+        idAgente: data.idAgente,
+        acao: "Auditoria de Ticket",
+        detalhes: JSON.stringify({ changes: auditChanges }),
       },
     });
   }
@@ -153,6 +154,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  await prisma.ticket.delete({ where: { id } });
+  await prisma.chamado.delete({ where: { id: Number(id) } });
   return NextResponse.json({ ok: true });
 }

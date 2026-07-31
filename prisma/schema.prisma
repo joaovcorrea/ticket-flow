@@ -1,192 +1,441 @@
 generator client {
+
   provider = "prisma-client-js"
+
 }
+
+
 
 datasource db {
-  provider = "sqlite"
+
+  provider = "mysql"
+
   url      = env("DATABASE_URL")
+
 }
 
-enum UserRole {
+
+
+enum PapelUsuario {
+
   ADMIN
+
   SUPERVISOR
-  AGENT
+
+  ATENDENTE
+
 }
 
-enum TicketStatus {
-  OPEN
-  PENDING
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
+
+
+enum StatusChamado {
+
+  ABERTO
+
+  PENDENTE
+
+  EM_ANDAMENTO
+
+  RESOLVIDO
+
+  FECHADO
+
 }
 
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
+
+
+enum PrioridadeChamado {
+
+  BAIXA
+
+  MEDIA
+
+  ALTA
+
+  URGENTE
+
 }
 
-enum TicketSource {
+
+
+enum OrigemChamado {
+
   WHATSAPP
+
   WEB
+
   EMAIL
-  PHONE
+
+  TELEFONE
+
 }
 
-enum SlaStatus {
-  ON_TRACK
-  AT_RISK
-  BREACHED
-  MET
+
+
+enum StatusSla {
+
+  NO_PRAZO
+
+  EM_RISCO
+
+  ESTOURADO
+
+  CUMPRIDO
+
 }
 
-enum PointReason {
-  TICKET_RESOLVED
-  SLA_MET
-  FIRST_RESPONSE
-  CUSTOMER_SATISFACTION
+
+
+enum MotivoPontos {
+
+  CHAMADO_RESOLVIDO
+
+  SLA_CUMPRIDO
+
+  PRIMEIRA_RESPOSTA
+
+  SATISFACAO_CLIENTE
+
   BONUS
-  PENALTY
+
+  PENALIDADE
+
 }
 
-model Department {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  color       String   @default("#3B82F6")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  agents      Agent[]
-  tickets     Ticket[]
-  slaPolicies SlaPolicy[]
+
+model Departamento {
+
+  id           Int      @id @default(autoincrement())
+
+  nome         String
+
+  descricao    String?
+
+  cor          String   @default("#3B82F6")
+
+  ativo        Boolean  @default(true)
+
+  criadoEm     DateTime @default(now())
+
+  atualizadoEm DateTime @updatedAt
+
+
+
+  atendentes   Atendente[]
+
+  chamados     Chamado[]
+
+  politicasSla PoliticaSla[]
+
+
+
+  @@map("departamento")
+
 }
 
-model Agent {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         UserRole @default(AGENT)
+
+
+model Atendente {
+
+  id           Int          @id @default(autoincrement())
+
+  nome         String
+
+  email        String       @unique
+
+  senhaHash    String
+
+  papel        PapelUsuario @default(ATENDENTE)
+
   avatar       String?
-  isActive     Boolean  @default(true)
-  totalPoints  Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
+  ativo        Boolean      @default(true)
 
-  assignedTickets Ticket[]       @relation("AssignedAgent")
-  messages        TicketMessage[]
-  pointLogs       AgentPointLog[]
-  activities      TicketActivity[]
+  pontosTotais Int          @default(0)
+
+  criadoEm     DateTime     @default(now())
+
+  atualizadoEm DateTime     @updatedAt
+
+
+
+  idDepartamento Int?
+
+  departamento   Departamento? @relation(fields: [idDepartamento], references: [id])
+
+
+
+  chamadosAtribuidos Chamado[]         @relation("AtendenteResponsavel")
+
+  mensagens          MensagemTicket[]
+
+  registrosPontos    RegistroPontos[]
+
+  historico          TicketHistorico[]
+
+
+
+  @@map("agente")
+
 }
 
-model SlaPolicy {
-  id                   String         @id @default(cuid())
-  name                 String
-  priority             TicketPriority
-  firstResponseMinutes Int
-  resolutionMinutes    Int
-  isActive             Boolean        @default(true)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
 
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
 
-  @@unique([departmentId, priority])
+model PoliticaSla {
+
+  id                      Int               @id @default(autoincrement())
+
+  nome                    String
+
+  prioridade              PrioridadeChamado
+
+  minutosPrimeiraResposta Int
+
+  minutosResolucao        Int
+
+  ativo                   Boolean           @default(true)
+
+  criadoEm                DateTime          @default(now())
+
+  atualizadoEm            DateTime          @updatedAt
+
+
+
+  idDepartamento Int?
+
+  departamento   Departamento? @relation(fields: [idDepartamento], references: [id])
+
+
+
+  @@unique([idDepartamento, prioridade])
+
+  @@map("politica_sla")
+
 }
 
-model Ticket {
-  id              String         @id @default(cuid())
-  ticketNumber    Int            @unique
-  subject         String
-  description     String
-  status          TicketStatus   @default(OPEN)
-  priority        TicketPriority @default(MEDIUM)
-  source          TicketSource   @default(WHATSAPP)
-  slaStatus       SlaStatus      @default(ON_TRACK)
 
-  requesterName   String
-  requesterPhone  String?
-  requesterEmail  String?
 
-  firstResponseAt DateTime?
-  resolvedAt      DateTime?
-  closedAt        DateTime?
-  slaDueAt        DateTime?
-  firstResponseDueAt DateTime?
+model Chamado {
 
-  whatsappChatId  String?
+  id            Int               @id @default(autoincrement())
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  numeroChamado Int               @unique
 
-  departmentId   String?
-  department     Department? @relation(fields: [departmentId], references: [id])
-  assignedAgentId String?
-  assignedAgent  Agent?      @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  assunto       String
 
-  messages   TicketMessage[]
-  activities TicketActivity[]
-  tags       TicketTag[]
+  descricao     String
+
+  status        StatusChamado     @default(ABERTO)
+
+  prioridade    PrioridadeChamado @default(MEDIA)
+
+  origem        OrigemChamado     @default(WHATSAPP)
+
+  statusSla     StatusSla         @default(NO_PRAZO)
+
+
+
+  nomeSolicitante     String
+
+  telefoneSolicitante String?
+
+  emailSolicitante    String?
+
+
+
+  primeiraRespostaEm           DateTime?
+
+  resolvidoEm                  DateTime?
+
+  fechadoEm                    DateTime?
+
+  slaVencimentoEm              DateTime?
+
+  primeiraRespostaVencimentoEm DateTime?
+
+
+
+  idChatWhatsapp String?
+
+
+
+  criadoEm     DateTime @default(now())
+
+  atualizadoEm DateTime @updatedAt
+
+
+
+  idDepartamento      Int?
+
+  departamento        Departamento? @relation(fields: [idDepartamento], references: [id])
+
+  idAgenteResponsavel Int?
+
+  atendenteResponsavel Atendente?   @relation("AtendenteResponsavel", fields: [idAgenteResponsavel], references: [id])
+
+
+
+  mensagens MensagemTicket[]
+
+  historico TicketHistorico[]
+
+  etiquetas ChamadoEtiqueta[]
+
+
+
+  @@map("chamado")
+
 }
 
-model TicketMessage {
-  id         String   @id @default(cuid())
-  content    String
-  isInternal Boolean  @default(false)
-  isFromAgent Boolean @default(false)
-  whatsappMessageId String?
-  createdAt  DateTime @default(now())
 
-  ticketId String
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  agentId  String?
-  agent    Agent? @relation(fields: [agentId], references: [id])
+
+model MensagemTicket {
+
+  id                 Int      @id @default(autoincrement())
+
+  conteudo           String
+
+  interno            Boolean  @default(false)
+
+  doAgente           Boolean  @default(false)
+
+  idMensagemWhatsapp String?
+
+  criadoEm           DateTime @default(now())
+
+
+
+  idChamado Int
+
+  chamado   Chamado @relation(fields: [idChamado], references: [id], onDelete: Cascade)
+
+  idAgente  Int?
+
+  atendente Atendente? @relation(fields: [idAgente], references: [id])
+
+
+
+  @@map("mensagem_ticket")
+
 }
 
-model TicketActivity {
-  id        String   @id @default(cuid())
-  action    String
-  details   String?
-  createdAt DateTime @default(now())
 
-  ticketId String
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  agentId  String?
-  agent    Agent? @relation(fields: [agentId], references: [id])
+
+model TicketHistorico {
+
+  id       Int      @id @default(autoincrement())
+
+  acao     String
+
+  detalhes String?
+
+  criadoEm DateTime @default(now())
+
+
+
+  idChamado Int
+
+  chamado   Chamado @relation(fields: [idChamado], references: [id], onDelete: Cascade)
+
+  idAgente  Int?
+
+  atendente Atendente? @relation(fields: [idAgente], references: [id])
+
+
+
+  @@map("ticket_historico")
+
 }
 
-model TicketTag {
-  id   String @id @default(cuid())
-  name String
 
-  tickets Ticket[]
+
+model Etiqueta {
+
+  id   Int    @id @default(autoincrement())
+
+  nome String
+
+
+
+  chamados ChamadoEtiqueta[]
+
+
+
+  @@map("etiqueta")
+
 }
 
-model AgentPointLog {
-  id        String      @id @default(cuid())
-  points    Int
-  reason    PointReason
-  note      String?
-  createdAt DateTime    @default(now())
 
-  agentId  String
-  agent    Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  ticketId String?
+
+model ChamadoEtiqueta {
+
+  idChamado  Int @map("id_chamado")
+
+  idEtiqueta Int @map("id_etiqueta")
+
+
+
+  chamado  Chamado  @relation(fields: [idChamado], references: [id], onDelete: Cascade)
+
+  etiqueta Etiqueta @relation(fields: [idEtiqueta], references: [id], onDelete: Cascade)
+
+
+
+  @@id([idChamado, idEtiqueta])
+
+  @@map("chamado_etiqueta")
+
 }
 
-model WhatsAppSession {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  name      String?
-  ticketId  String?
-  lastMessageAt DateTime @default(now())
-  createdAt DateTime @default(now())
+
+
+model RegistroPontos {
+
+  id         Int          @id @default(autoincrement())
+
+  pontos     Int
+
+  motivo     MotivoPontos
+
+  observacao String?
+
+  criadoEm   DateTime     @default(now())
+
+
+
+  idAgente  Int
+
+  atendente Atendente @relation(fields: [idAgente], references: [id], onDelete: Cascade)
+
+  idChamado Int?
+
+
+
+  @@map("registro_pontos")
+
 }
+
+
+
+model SessaoWhatsapp {
+
+  id               Int      @id @default(autoincrement())
+
+  telefone         String   @unique
+
+  nome             String?
+
+  idChamado        Int?
+
+  ultimaMensagemEm DateTime @default(now())
+
+  criadoEm         DateTime @default(now())
+
+
+
+  @@map("sessao_whatsapp")
+
+}
+
+

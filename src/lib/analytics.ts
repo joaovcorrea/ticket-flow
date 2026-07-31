@@ -18,41 +18,41 @@ export async function getDashboardStats() {
     byStatus,
     recentTickets,
   ] = await Promise.all([
-    prisma.ticket.count({
-      where: { status: { in: ["OPEN", "PENDING"] } },
+    prisma.chamado.count({
+      where: { status: { in: ["ABERTO", "PENDENTE"] } },
     }),
-    prisma.ticket.count({ where: { status: "IN_PROGRESS" } }),
-    prisma.ticket.count({
+    prisma.chamado.count({ where: { status: "EM_ANDAMENTO" } }),
+    prisma.chamado.count({
       where: {
-        resolvedAt: { gte: startOfDay(today), lte: endOfDay(today) },
+        resolvidoEm: { gte: startOfDay(today), lte: endOfDay(today) },
       },
     }),
-    prisma.ticket.count({
-      where: { resolvedAt: { gte: weekAgo } },
+    prisma.chamado.count({
+      where: { resolvidoEm: { gte: weekAgo } },
     }),
-    prisma.ticket.count({ where: { slaStatus: "BREACHED" } }),
-    prisma.ticket.count({ where: { slaStatus: "MET" } }),
-    prisma.agent.count({ where: { isActive: true } }),
-    prisma.agent.findMany({
-      where: { isActive: true },
-      orderBy: { totalPoints: "desc" },
+    prisma.chamado.count({ where: { statusSla: "ESTOURADO" } }),
+    prisma.chamado.count({ where: { statusSla: "CUMPRIDO" } }),
+    prisma.atendente.count({ where: { ativo: true } }),
+    prisma.atendente.findMany({
+      where: { ativo: true },
+      orderBy: { pontosTotais: "desc" },
       take: 5,
-      include: { department: true },
+      include: { departamento: true },
     }),
-    prisma.department.findMany({
-      where: { isActive: true },
+    prisma.departamento.findMany({
+      where: { ativo: true },
       include: {
-        _count: { select: { tickets: true, agents: true } },
+        _count: { select: { chamados: true, atendentes: true } },
       },
     }),
-    prisma.ticket.groupBy({
+    prisma.chamado.groupBy({
       by: ["status"],
       _count: { id: true },
     }),
-    prisma.ticket.findMany({
-      orderBy: { createdAt: "desc" },
+    prisma.chamado.findMany({
+      orderBy: { criadoEm: "desc" },
       take: 8,
-      include: { department: true, assignedAgent: true },
+      include: { departamento: true, atendenteResponsavel: true },
     }),
   ]);
 
@@ -79,45 +79,45 @@ export async function getReportData(days = 30) {
 
   const [resolvedByAgent, resolvedByDepartment, byPriority, bySource, timeline] =
     await Promise.all([
-      prisma.agent.findMany({
-        where: { isActive: true },
+      prisma.atendente.findMany({
+        where: { ativo: true },
         include: {
-          assignedTickets: {
-            where: { resolvedAt: { gte: since } },
+          chamadosAtribuidos: {
+            where: { resolvidoEm: { gte: since } },
             select: { id: true },
           },
-          department: true,
+          departamento: true,
         },
-        orderBy: { totalPoints: "desc" },
+        orderBy: { pontosTotais: "desc" },
       }),
-      prisma.department.findMany({
-        where: { isActive: true },
+      prisma.departamento.findMany({
+        where: { ativo: true },
         include: {
-          tickets: {
-            where: { resolvedAt: { gte: since } },
-            select: { id: true, slaStatus: true },
+          chamados: {
+            where: { resolvidoEm: { gte: since } },
+            select: { id: true, statusSla: true },
           },
         },
       }),
-      prisma.ticket.groupBy({
-        by: ["priority"],
-        where: { createdAt: { gte: since } },
+      prisma.chamado.groupBy({
+        by: ["prioridade"],
+        where: { criadoEm: { gte: since } },
         _count: { id: true },
       }),
-      prisma.ticket.groupBy({
-        by: ["source"],
-        where: { createdAt: { gte: since } },
+      prisma.chamado.groupBy({
+        by: ["origem"],
+        where: { criadoEm: { gte: since } },
         _count: { id: true },
       }),
-      prisma.ticket.findMany({
-        where: { createdAt: { gte: since } },
-        select: { createdAt: true, resolvedAt: true, status: true },
-        orderBy: { createdAt: "asc" },
+      prisma.chamado.findMany({
+        where: { criadoEm: { gte: since } },
+        select: { criadoEm: true, resolvidoEm: true, status: true },
+        orderBy: { criadoEm: "asc" },
       }).then((items) =>
         items.map((item) => ({
           ...item,
-          createdAt: item.createdAt.toISOString(),
-          resolvedAt: item.resolvedAt ? item.resolvedAt.toISOString() : null,
+          criadoEm: item.criadoEm.toISOString(),
+          resolvidoEm: item.resolvidoEm ? item.resolvidoEm.toISOString() : null,
           status: item.status,
         }))
       ),

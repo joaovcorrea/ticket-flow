@@ -2,45 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { applySlaToTicket } from "@/lib/sla";
+import { getNextNumeroChamado } from "@/lib/tickets";
 
 const createTicketSchema = z.object({
-  subject: z.string().min(1),
-  description: z.string().min(1),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
-  source: z.enum(["WHATSAPP", "WEB", "EMAIL", "PHONE"]).default("WEB"),
-  requesterName: z.string().min(1),
-  requesterPhone: z.string().optional(),
-  requesterEmail: z.string().email().optional().or(z.literal("")),
-  departmentId: z.string().optional(),
-  assignedAgentId: z.string().optional(),
+  assunto: z.string().min(1),
+  descricao: z.string().min(1),
+  prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).default("MEDIA"),
+  origem: z.enum(["WHATSAPP", "WEB", "EMAIL", "TELEFONE"]).default("WEB"),
+  nomeSolicitante: z.string().min(1),
+  telefoneSolicitante: z.string().optional(),
+  emailSolicitante: z.string().email().optional().or(z.literal("")),
+  idDepartamento: z.coerce.number().optional(),
+  idAgenteResponsavel: z.coerce.number().optional(),
 });
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
-  const departmentId = searchParams.get("departmentId");
-  const assignedAgentId = searchParams.get("assignedAgentId");
+  const idDepartamento = searchParams.get("idDepartamento");
+  const idAgenteResponsavel = searchParams.get("idAgenteResponsavel");
   const search = searchParams.get("search");
 
-  const tickets = await prisma.ticket.findMany({
+  const tickets = await prisma.chamado.findMany({
     where: {
       ...(status && { status: status as never }),
-      ...(departmentId && { departmentId }),
-      ...(assignedAgentId && { assignedAgentId }),
+      ...(idDepartamento && { idDepartamento: Number(idDepartamento) }),
+      ...(idAgenteResponsavel && { idAgenteResponsavel: Number(idAgenteResponsavel) }),
       ...(search && {
         OR: [
-          { subject: { contains: search } },
-          { requesterName: { contains: search } },
-          { requesterPhone: { contains: search } },
+          { assunto: { contains: search } },
+          { nomeSolicitante: { contains: search } },
+          { telefoneSolicitante: { contains: search } },
         ],
       }),
     },
     include: {
-      department: true,
-      assignedAgent: true,
-      _count: { select: { messages: true } },
+      departamento: true,
+      atendenteResponsavel: true,
+      _count: { select: { mensagens: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { criadoEm: "desc" },
   });
 
   return NextResponse.json(tickets);
@@ -50,21 +51,21 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const data = createTicketSchema.parse(body);
 
-  const ticketNumber = (await prisma.ticket.count()) + 1;
+  const numeroChamado = await getNextNumeroChamado();
 
-  const ticket = await prisma.ticket.create({
+  const ticket = await prisma.chamado.create({
     data: {
       ...data,
-      ticketNumber,
-      requesterEmail: data.requesterEmail || undefined,
-      activities: {
-        create: { action: "Ticket Criado", details: "Ticket criado manualmente" },
+      numeroChamado,
+      emailSolicitante: data.emailSolicitante || undefined,
+      historico: {
+        create: { acao: "Ticket Criado", detalhes: "Ticket criado manualmente" },
       },
     },
-    include: { department: true, assignedAgent: true },
+    include: { departamento: true, atendenteResponsavel: true },
   });
 
-  await applySlaToTicket(ticket.id, ticket.priority, ticket.departmentId);
+  await applySlaToTicket(ticket.id, ticket.prioridade, ticket.idDepartamento);
 
   return NextResponse.json(ticket, { status: 201 });
 }

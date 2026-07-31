@@ -4,43 +4,43 @@ import { z } from "zod";
 import { subDays } from "date-fns";
 
 const schema = z.object({
-  name: z.string().min(1),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  firstResponseMinutes: z.number().int().positive(),
-  resolutionMinutes: z.number().int().positive(),
-  departmentId: z.string().nullable().optional(),
+  nome: z.string().min(1),
+  prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]),
+  minutosPrimeiraResposta: z.number().int().positive(),
+  minutosResolucao: z.number().int().positive(),
+  idDepartamento: z.coerce.number().nullable().optional(),
 });
 
 export async function GET() {
-  const policies = await prisma.slaPolicy.findMany({
-    include: { department: true },
-    orderBy: [{ departmentId: "asc" }, { priority: "asc" }],
+  const policies = await prisma.politicaSla.findMany({
+    include: { departamento: true },
+    orderBy: [{ idDepartamento: "asc" }, { prioridade: "asc" }],
   });
 
   const since = subDays(new Date(), 30);
-  const departments = await prisma.department.findMany({
-    include: { _count: { select: { tickets: true } } },
-    orderBy: { name: "asc" },
+  const departments = await prisma.departamento.findMany({
+    include: { _count: { select: { chamados: true } } },
+    orderBy: { nome: "asc" },
   });
 
-  const resolvedTickets = await prisma.ticket.findMany({
+  const resolvedTickets = await prisma.chamado.findMany({
     where: {
-      resolvedAt: { gte: since },
-      departmentId: { not: null },
+      resolvidoEm: { gte: since },
+      idDepartamento: { not: null },
     },
-    include: { department: true },
+    include: { departamento: true },
   });
 
   const metrics = departments.map((department) => {
-    const tickets = resolvedTickets.filter((ticket) => ticket.departmentId === department.id);
+    const tickets = resolvedTickets.filter((ticket) => ticket.idDepartamento === department.id);
     const total = tickets.length;
-    const met = tickets.filter((ticket) => ticket.slaStatus === "MET").length;
-    const breached = tickets.filter((ticket) => ticket.slaStatus === "BREACHED").length;
+    const met = tickets.filter((ticket) => ticket.statusSla === "CUMPRIDO").length;
+    const breached = tickets.filter((ticket) => ticket.statusSla === "ESTOURADO").length;
     const compliance = total > 0 ? Math.round((met / total) * 100) : 100;
 
     return {
       id: department.id,
-      name: department.name,
+      nome: department.nome,
       total,
       met,
       breached,
@@ -53,7 +53,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const data = schema.parse(await request.json());
-  const policy = await prisma.slaPolicy.create({ data });
+  const policy = await prisma.politicaSla.create({ data });
   return NextResponse.json(policy, { status: 201 });
 }
 
@@ -62,10 +62,10 @@ export async function PUT(request: NextRequest) {
   const { id, ...rest } = body;
   const data = schema.partial().parse(rest);
 
-  const policy = await prisma.slaPolicy.update({
-    where: { id },
+  const policy = await prisma.politicaSla.update({
+    where: { id: Number(id) },
     data,
-    include: { department: true },
+    include: { departamento: true },
   });
   return NextResponse.json(policy);
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ROLE_LABELS, POINT_REASON_LABELS } from "@/lib/utils";
+import { ROLE_LABELS } from "@/lib/utils";
 import { Trophy, Star } from "lucide-react";
 import { CreateAgentForm } from "@/components/admin/create-agent-form";
 
@@ -9,17 +9,17 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
   const [agents, departments] = await Promise.all([
-    prisma.agent.findMany({
+    prisma.atendente.findMany({
       include: {
-        department: true,
-        pointLogs: { orderBy: { createdAt: "desc" }, take: 5 },
-        _count: { select: { assignedTickets: true } },
+        departamento: true,
+        registrosPontos: { orderBy: { criadoEm: "desc" }, take: 5 },
+        _count: { select: { chamadosAtribuidos: true } },
       },
-      orderBy: { totalPoints: "desc" },
+      orderBy: { pontosTotais: "desc" },
     }),
-    prisma.department.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
+    prisma.departamento.findMany({
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
     }),
   ]);
 
@@ -40,11 +40,11 @@ export default async function AgentsPage() {
                 {i === 0 ? <Trophy className="h-5 w-5" /> : <Star className="h-5 w-5" />}
               </div>
               <div>
-                <p className="font-semibold">{agent.name}</p>
-                <p className="text-xs text-slate-500">{agent.department?.name || "Sem departamento"}</p>
+                <p className="font-semibold">{agent.nome}</p>
+                <p className="text-xs text-slate-500">{agent.departamento?.nome || "Sem departamento"}</p>
               </div>
               <div className="ml-auto text-right">
-                <p className="text-xl font-bold text-brand-600">{agent.totalPoints}</p>
+                <p className="text-xl font-bold text-brand-600">{agent.pontosTotais}</p>
                 <p className="text-xs text-slate-500">pontos</p>
               </div>
             </div>
@@ -70,17 +70,17 @@ export default async function AgentsPage() {
             {agents.map((agent, i) => (
               <tr key={agent.id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-4 py-3 font-bold text-slate-400">{i + 1}</td>
-                <td className="px-4 py-3 font-medium">{agent.name}</td>
+                <td className="px-4 py-3 font-medium">{agent.nome}</td>
                 <td className="px-4 py-3 text-slate-500">{agent.email}</td>
-                <td className="px-4 py-3">{agent.department?.name || "—"}</td>
+                <td className="px-4 py-3">{agent.departamento?.nome || "—"}</td>
                 <td className="px-4 py-3">
-                  <Badge>{ROLE_LABELS[agent.role]}</Badge>
+                  <Badge>{ROLE_LABELS[agent.papel]}</Badge>
                 </td>
-                <td className="px-4 py-3">{agent._count.assignedTickets}</td>
-                <td className="px-4 py-3 font-bold text-brand-600">{agent.totalPoints}</td>
+                <td className="px-4 py-3">{agent._count.chamadosAtribuidos}</td>
+                <td className="px-4 py-3 font-bold text-brand-600">{agent.pontosTotais}</td>
                 <td className="px-4 py-3">
-                  <Badge variant={agent.isActive ? "resolved" : "closed"}>
-                    {agent.isActive ? "Ativo" : "Inativo"}
+                  <Badge variant={agent.ativo ? "resolvido" : "fechado"}>
+                    {agent.ativo ? "Ativo" : "Inativo"}
                   </Badge>
                 </td>
               </tr>

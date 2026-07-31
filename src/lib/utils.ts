@@ -20,45 +20,49 @@ export function formatDuration(minutes: number) {
 }
 
 export const STATUS_LABELS: Record<string, string> = {
-  OPEN: "Aberto",
-  PENDING: "Pendente",
-  IN_PROGRESS: "Em andamento",
-  RESOLVED: "Resolvido",
-  CLOSED: "Fechado",
+  ABERTO: "Aberto",
+  PENDENTE: "Pendente",
+  EM_ANDAMENTO: "Em andamento",
+  RESOLVIDO: "Resolvido",
+  FECHADO: "Fechado",
 };
 
 export const PRIORITY_LABELS: Record<string, string> = {
-  LOW: "Baixa",
-  MEDIUM: "Média",
-  HIGH: "Alta",
-  URGENT: "Urgente",
+  BAIXA: "Baixa",
+  MEDIA: "Média",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
 };
 
 export const SLA_LABELS: Record<string, string> = {
-  ON_TRACK: "No prazo",
-  AT_RISK: "Em risco",
-  BREACHED: "Violado",
-  MET: "Cumprido",
+  NO_PRAZO: "No prazo",
+  EM_RISCO: "Em risco",
+  ESTOURADO: "Violado",
+  CUMPRIDO: "Cumprido",
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
   WHATSAPP: "WhatsApp",
   WEB: "Web",
   EMAIL: "E-mail",
-  PHONE: "Telefone",
+  TELEFONE: "Telefone",
 };
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrador",
   SUPERVISOR: "Supervisor",
-  AGENT: "Agente",
+  ATENDENTE: "Agente",
 };
 
 export const POINT_REASON_LABELS: Record<string, string> = {
-  TICKET_RESOLVED: "Ticket resolvido",
-  SLA_MET: "SLA cumprido",
-  FIRST_RESPONSE: "Primeira resposta",
-  CUSTOMER_SATISFACTION: "Satisfação do cliente",
+  CHAMADO_RESOLVIDO: "Ticket resolvido",
+  SLA_CUMPRIDO: "SLA cumprido",
+  PRIMEIRA_RESPOSTA: "Primeira resposta",
+  SATISFACAO_CLIENTE: "Satisfação do cliente",
   BONUS: "Bônus",
-  PENALTY: "Penalidade",
+  PENALIDADE: "Penalidade",
 };
+
+export function enumVariant(value: string) {
+  return value.toLowerCase();
+}

@@ -90,11 +90,11 @@ export function Sidebar() {
             <div className="space-y-2">
               <Link href="/tickets/new" className="flex items-center gap-2 rounded-lg bg-brand-600/20 px-2.5 py-2 text-sm text-slate-100 transition-colors hover:bg-brand-600/30">
                 <PlusCircle className="h-4 w-4" />
-                Novo ticket
+                Novo Ticket
               </Link>
               <Link href="/agents" className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition-colors hover:bg-white/10 hover:text-white">
                 <Users className="h-4 w-4" />
-                Cadastrar agente
+                Cadastrar Agente
               </Link>
             </div>
           </div>

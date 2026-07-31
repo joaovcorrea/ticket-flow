@@ -4,38 +4,38 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const schema = z.object({
-  agentId: z.string().min(1),
-  name: z.string().min(1),
+  idAgente: z.coerce.number().min(1),
+  nome: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6).optional(),
+  senha: z.string().min(6).optional(),
   avatar: z.string().optional(),
 });
 
 export async function PUT(request: NextRequest) {
   const data = schema.parse(await request.json());
 
-  const existing = await prisma.agent.findUnique({ where: { id: data.agentId } });
+  const existing = await prisma.atendente.findUnique({ where: { id: data.idAgente } });
   if (!existing) {
     return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
   }
 
   const updateData: Record<string, unknown> = {
-    name: data.name,
+    nome: data.nome,
     email: data.email,
   };
 
-  if (data.password) {
-    updateData.passwordHash = await bcrypt.hash(data.password, 10);
+  if (data.senha) {
+    updateData.senhaHash = await bcrypt.hash(data.senha, 10);
   }
 
   if (data.avatar !== undefined) {
     updateData.avatar = data.avatar || null;
   }
 
-  const agent = await prisma.agent.update({
-    where: { id: data.agentId },
+  const agent = await prisma.atendente.update({
+    where: { id: data.idAgente },
     data: updateData,
   });
 
-  return NextResponse.json({ id: agent.id, name: agent.name, email: agent.email, avatar: agent.avatar });
+  return NextResponse.json({ id: agent.id, nome: agent.nome, email: agent.email, avatar: agent.avatar });
 }

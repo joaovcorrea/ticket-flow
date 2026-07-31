@@ -6,10 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/badge";
 
 const initialState = {
-  name: "",
-  description: "",
-  color: "#3B82F6",
-  isActive: true,
+  nome: "",
+  descricao: "",
+  cor: "#3B82F6",
+  ativo: true,
 };
 
 export function CreateDepartmentForm() {
@@ -30,7 +30,7 @@ export function CreateDepartmentForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        isActive: form.isActive,
+        ativo: form.ativo,
       }),
     });
 
@@ -62,8 +62,8 @@ export function CreateDepartmentForm() {
           <label className="mb-1 block text-sm font-medium text-slate-700">Nome</label>
           <input
             required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            value={form.nome}
+            onChange={(e) => setForm({ ...form, nome: e.target.value })}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
             placeholder="Ex: Suporte Técnico"
           />
@@ -72,8 +72,8 @@ export function CreateDepartmentForm() {
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-medium text-slate-700">Descrição</label>
           <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            value={form.descricao}
+            onChange={(e) => setForm({ ...form, descricao: e.target.value })}
             className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
             placeholder="Descreva o escopo do departamento"
           />
@@ -83,8 +83,8 @@ export function CreateDepartmentForm() {
           <label className="mb-1 block text-sm font-medium text-slate-700">Cor</label>
           <input
             type="color"
-            value={form.color}
-            onChange={(e) => setForm({ ...form, color: e.target.value })}
+            value={form.cor}
+            onChange={(e) => setForm({ ...form, cor: e.target.value })}
             className="h-10 w-full cursor-pointer rounded-lg border border-slate-300"
           />
         </div>
@@ -92,8 +92,8 @@ export function CreateDepartmentForm() {
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
           <select
-            value={form.isActive ? "true" : "false"}
-            onChange={(e) => setForm({ ...form, isActive: e.target.value === "true" })}
+            value={form.ativo ? "true" : "false"}
+            onChange={(e) => setForm({ ...form, ativo: e.target.value === "true" })}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
           >
             <option value="true">Ativo</option>
