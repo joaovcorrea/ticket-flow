@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card } from "@/components/ui/card";
 import { Badge, Button } from "@/components/ui/badge";
@@ -107,7 +107,7 @@ function getActivityMeta(action: string) {
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
-  const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
+  const [agents, setAgents] = useState<Array<{ id: string; name: string; departmentId: number | null }>>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [message, setMessage] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -151,7 +151,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       fetch(`/api/tickets/${id}`)
         .then((r) => r.json())
         .then((data) => setTicket(normalizeTicket(data)));
-      fetch("/api/agents").then((r) => r.json()).then(setAgents);
+      fetch("/api/agents")
+        .then((r) => r.json())
+        .then((data) =>
+          setAgents(
+            (data || []).map((agent: any) => ({
+              id: String(agent.id),
+              name: agent.nome,
+              departmentId: agent.idDepartamento ?? agent.departamento?.id ?? null,
+            }))
+          )
+        );
       fetch("/api/departments")
         .then((r) => r.json())
         .then((data) =>
@@ -171,6 +181,33 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       idAgenteResponsavel: ticket.assignedAgent?.id ? Number(ticket.assignedAgent.id) : null,
     });
   }, [ticket]);
+
+  const filteredAgents = useMemo(() => {
+    if (!propsDraft.idDepartamento) {
+      return [];
+    }
+
+    return agents.filter((agent) => agent.departmentId === propsDraft.idDepartamento);
+  }, [agents, propsDraft.idDepartamento]);
+
+  useEffect(() => {
+    if (propsDraft.idAgenteResponsavel == null) {
+      return;
+    }
+
+    if (!propsDraft.idDepartamento) {
+      setPropsDraft((current) => ({ ...current, idAgenteResponsavel: null }));
+      return;
+    }
+
+    const stillValid = agents.some(
+      (agent) => agent.id === String(propsDraft.idAgenteResponsavel) && agent.departmentId === propsDraft.idDepartamento
+    );
+
+    if (!stillValid) {
+      setPropsDraft((current) => ({ ...current, idAgenteResponsavel: null }));
+    }
+  }, [propsDraft.idDepartamento, propsDraft.idAgenteResponsavel, agents]);
 
   async function updateTicket(data: Record<string, unknown>) {
     setLoading(true);
@@ -534,7 +571,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                   className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   <option value="">Não atribuído</option>
-                  {agents.map((a) => (
+                  {filteredAgents.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>

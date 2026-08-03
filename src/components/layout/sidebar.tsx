@@ -16,8 +16,10 @@ import {
   UserCircle2,
   PlusCircle,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { clearStoredUser } from "@/lib/auth";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -96,6 +98,17 @@ export function Sidebar() {
                 <Users className="h-4 w-4" />
                 Cadastrar Agente
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  clearStoredUser();
+                  window.location.href = "/login";
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </button>
             </div>
           </div>
 
