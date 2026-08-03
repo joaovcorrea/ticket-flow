@@ -36,6 +36,8 @@ enum StatusChamado {
 
   EM_ANDAMENTO
 
+  REABERTO
+
   RESOLVIDO
 
   FECHADO
@@ -233,8 +235,7 @@ model Chamado {
   origem        OrigemChamado     @default(WHATSAPP)
 
   statusSla     StatusSla         @default(NO_PRAZO)
-
-
+ 
 
   nomeSolicitante     String
 
@@ -249,6 +250,8 @@ model Chamado {
   resolvidoEm                  DateTime?
 
   fechadoEm                    DateTime?
+
+  reabertoEm                   DateTime?
 
   slaVencimentoEm              DateTime?
 
@@ -268,15 +271,16 @@ model Chamado {
 
   idDepartamento      Int?
 
-  departamento        Departamento? @relation(fields: [idDepartamento], references: [id])
+  departamento        Departamento? @relation(fields: [idDepartamento], references: [id], onDelete: SetNull)
 
   idAgenteResponsavel Int?
 
-  atendenteResponsavel Atendente?   @relation("AtendenteResponsavel", fields: [idAgenteResponsavel], references: [id])
+  atendenteResponsavel Atendente?   @relation("AtendenteResponsavel", fields: [idAgenteResponsavel], references: [id], onDelete: SetNull)
 
 
 
   mensagens MensagemTicket[]
+  auditorias ChamadoAuditoria[]
 
   historico TicketHistorico[]
 
@@ -436,6 +440,26 @@ model SessaoWhatsapp {
 
   @@map("sessao_whatsapp")
 
+}
+
+
+model ChamadoAuditoria {
+  id          Int      @id @default(autoincrement())
+  chamadoId   Int
+  chamado     Chamado  @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  evento      String
+  idAgente    Int?
+  atendente   Atendente? @relation("AtendenteChamadoAuditoria", fields: [idAgente], references: [id], onDelete: SetNull)
+  dadosAntes  Json?
+  dadosDepois Json?
+  link        String?
+  criadoEm    DateTime  @default(now())
+
+  @@map("chamado_auditoria")
+  @@index([chamadoId])
+  @@index([evento])
+  @@index([idAgente])
+  @@index([criadoEm])
 }
 
 

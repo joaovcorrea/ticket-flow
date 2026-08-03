@@ -115,9 +115,8 @@ export async function getReportData(days = 30) {
         orderBy: { criadoEm: "asc" },
       }).then((items) =>
         items.map((item) => ({
-          ...item,
-          criadoEm: item.criadoEm.toISOString(),
-          resolvidoEm: item.resolvidoEm ? item.resolvidoEm.toISOString() : null,
+          createdAt: item.criadoEm.toISOString(),
+          resolvedAt: item.resolvidoEm ? item.resolvidoEm.toISOString() : null,
           status: item.status,
         }))
       ),

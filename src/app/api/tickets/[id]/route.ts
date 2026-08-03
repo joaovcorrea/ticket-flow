@@ -8,7 +8,7 @@ import { MotivoPontos } from "@prisma/client";
 const updateSchema = z.object({
   assunto: z.string().optional(),
   descricao: z.string().optional(),
-  status: z.enum(["ABERTO", "PENDENTE", "EM_ANDAMENTO", "RESOLVIDO", "FECHADO"]).optional(),
+  status: z.enum(["ABERTO", "PENDENTE", "EM_ANDAMENTO", "REABERTO", "RESOLVIDO", "FECHADO"]).optional(),
   prioridade: z.enum(["BAIXA", "MEDIA", "ALTA", "URGENTE"]).optional(),
   idDepartamento: z.coerce.number().nullable().optional(),
   idAgenteResponsavel: z.coerce.number().nullable().optional(),
@@ -66,6 +66,9 @@ export async function PATCH(
     }
     if (data.status === "FECHADO" && !existing.fechadoEm) {
       updateData.fechadoEm = new Date();
+    }
+    if (data.status === "REABERTO" && !existing.reabertoEm) {
+      updateData.reabertoEm = new Date();
     }
     auditChanges.push(`status:${data.status}`);
   }

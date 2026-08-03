@@ -12,7 +12,7 @@ import { subHours, subDays } from "date-fns";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding Ticket Flow...");
+  console.log("Enviando Ticket Flow...");
 
   const ti = await prisma.departamento.create({
     data: { nome: "TI / Suporte", descricao: "Infraestrutura, sistemas e acessos", cor: "#3B82F6" },
@@ -197,7 +197,7 @@ async function main() {
     ],
   });
 
-  console.log("✅ Seed concluído!");
+  console.log("✅ Envio concluído!");
   console.log("   Departamentos: 3");
   console.log("   Agentes: 4 (senha padrão: 123456)");
   console.log("   Tickets: 5");

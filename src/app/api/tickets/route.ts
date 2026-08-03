@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { applySlaToTicket } from "@/lib/sla";
-import { getNextNumeroChamado } from "@/lib/tickets";
+import { createWithUniqueNumeroChamado } from "@/lib/tickets";
 
 const createTicketSchema = z.object({
   assunto: z.string().min(1),
@@ -51,19 +51,19 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const data = createTicketSchema.parse(body);
 
-  const numeroChamado = await getNextNumeroChamado();
-
-  const ticket = await prisma.chamado.create({
-    data: {
-      ...data,
-      numeroChamado,
-      emailSolicitante: data.emailSolicitante || undefined,
-      historico: {
-        create: { acao: "Ticket Criado", detalhes: "Ticket criado manualmente" },
+  const ticket = await createWithUniqueNumeroChamado(async (numeroChamado) =>
+    prisma.chamado.create({
+      data: {
+        ...data,
+        numeroChamado,
+        emailSolicitante: data.emailSolicitante || undefined,
+        historico: {
+          create: { acao: "Ticket Criado", detalhes: "Ticket criado manualmente" },
+        },
       },
-    },
-    include: { departamento: true, atendenteResponsavel: true },
-  });
+      include: { departamento: true, atendenteResponsavel: true },
+    })
+  );
 
   await applySlaToTicket(ticket.id, ticket.prioridade, ticket.idDepartamento);
 

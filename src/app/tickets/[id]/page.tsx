@@ -10,11 +10,10 @@ import {
   PRIORITY_LABELS,
   SLA_LABELS,
   SOURCE_LABELS,
-  formatDuration,
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, ArrowLeft, MessageCircle, User, Clock3, RefreshCw, Building2, CheckCircle2 } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, User, Clock3, RefreshCw, Building2, CheckCircle2, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
 interface TicketDetail {
@@ -26,7 +25,7 @@ interface TicketDetail {
   priority: string;
   source: string;
   slaStatus: string;
-  requesterName: string;
+  requesterName: string | null;
   requesterPhone: string | null;
   slaDueAt: string | null;
   firstResponseDueAt: string | null;
@@ -47,6 +46,40 @@ interface TicketDetail {
     createdAt: string;
     agent: { name: string } | null;
   }>;
+}
+
+function normalizeTicket(ticket: any): TicketDetail {
+  return {
+    id: String(ticket.id),
+    ticketNumber: ticket.numeroChamado,
+    subject: ticket.assunto,
+    description: ticket.descricao,
+    status: ticket.status,
+    priority: ticket.prioridade,
+    source: ticket.origem,
+    slaStatus: ticket.statusSla,
+    requesterName: ticket.nomeSolicitante ?? null,
+    requesterPhone: ticket.telefoneSolicitante ?? null,
+    slaDueAt: ticket.slaVencimentoEm ?? null,
+    firstResponseDueAt: ticket.primeiraRespostaVencimentoEm ?? null,
+    department: ticket.departamento ? { id: String(ticket.departamento.id), name: ticket.departamento.nome } : null,
+    assignedAgent: ticket.atendenteResponsavel ? { id: String(ticket.atendenteResponsavel.id), name: ticket.atendenteResponsavel.nome } : null,
+    messages: (ticket.mensagens ?? []).map((msg: any) => ({
+      id: String(msg.id),
+      content: msg.conteudo,
+      isFromAgent: msg.doAgente,
+      isInternal: msg.interno,
+      createdAt: msg.criadoEm,
+      agent: msg.atendente ? { name: msg.atendente.nome } : null,
+    })),
+    activities: (ticket.historico ?? []).map((act: any) => ({
+      id: String(act.id),
+      action: act.acao,
+      details: act.detalhes,
+      createdAt: act.criadoEm,
+      agent: act.atendente ? { name: act.atendente.nome } : null,
+    })),
+  };
 }
 
 function getActivityMeta(action: string) {
@@ -81,16 +114,63 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [ticketId, setTicketId] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"conversation" | "audit">("conversation");
+  const [sendMode, setSendMode] = useState<"default" | "resolve" | "pendingCustomer">("default");
+  const [sendMenuOpen, setSendMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const sendMenuRef = useRef<HTMLDivElement | null>(null);
+  const currentAgentId = ticket?.assignedAgent?.id
+    ? Number(ticket.assignedAgent.id)
+    : agents[0]?.id
+      ? Number(agents[0].id)
+      : undefined;
+  const [propsDraft, setPropsDraft] = useState<{
+    status: string;
+    prioridade: string;
+    idDepartamento: number | null;
+    idAgenteResponsavel: number | null;
+  }>({ status: "", prioridade: "", idDepartamento: null, idAgenteResponsavel: null });
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent | TouchEvent) {
+      if (sendMenuOpen && sendMenuRef.current && !sendMenuRef.current.contains(event.target as Node)) {
+        setSendMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [sendMenuOpen]);
 
   useEffect(() => {
     params.then(({ id }) => {
       setTicketId(id);
-      fetch(`/api/tickets/${id}`).then((r) => r.json()).then(setTicket);
+      fetch(`/api/tickets/${id}`)
+        .then((r) => r.json())
+        .then((data) => setTicket(normalizeTicket(data)));
       fetch("/api/agents").then((r) => r.json()).then(setAgents);
-      fetch("/api/departments").then((r) => r.json()).then(setDepartments);
+      fetch("/api/departments")
+        .then((r) => r.json())
+        .then((data) =>
+          setDepartments(
+            (data || []).map((d: any) => ({ id: String(d.id), name: d.nome }))
+          )
+        );
     });
   }, [params]);
+
+  useEffect(() => {
+    if (!ticket) return;
+    setPropsDraft({
+      status: ticket.status,
+      prioridade: ticket.priority,
+      idDepartamento: ticket.department?.id ? Number(ticket.department.id) : null,
+      idAgenteResponsavel: ticket.assignedAgent?.id ? Number(ticket.assignedAgent.id) : null,
+    });
+  }, [ticket]);
 
   async function updateTicket(data: Record<string, unknown>) {
     setLoading(true);
@@ -101,15 +181,29 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     });
     if (res.ok) {
       const updated = await fetch(`/api/tickets/${ticketId}`).then((r) => r.json());
-      setTicket(updated);
+      setTicket(normalizeTicket(updated));
     }
     setLoading(false);
   }
 
   async function sendMessage() {
     if (!message.trim()) return;
-    await updateTicket({ message, isInternal, agentId: agents[0]?.id });
+
+    const payload: Record<string, unknown> = {
+      mensagem: message,
+      interno: isInternal,
+      idAgente: currentAgentId,
+    };
+
+    if (sendMode === "resolve") {
+      payload.status = "RESOLVIDO";
+    } else if (sendMode === "pendingCustomer") {
+      payload.status = "PENDENTE";
+    }
+
+    await updateTicket(payload);
     setMessage("");
+    setSendMenuOpen(false);
   }
 
   function openInternalNote() {
@@ -137,9 +231,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-3 flex flex-wrap gap-2">
-              <Badge variant={ticket.priority.toLowerCase()}>{PRIORITY_LABELS[ticket.priority]}</Badge>
-              <Badge variant={ticket.slaStatus.toLowerCase()}>{SLA_LABELS[ticket.slaStatus]}</Badge>
-              <Badge variant={ticket.source.toLowerCase()}>{SOURCE_LABELS[ticket.source]}</Badge>
+              <Badge variant={ticket.priority?.toLowerCase() ?? "default"}>{PRIORITY_LABELS[ticket.priority] ?? "Sem prioridade"}</Badge>
+              <Badge variant={ticket.slaStatus?.toLowerCase() ?? "default"}>{SLA_LABELS[ticket.slaStatus] ?? "Sem SLA"}</Badge>
+              <Badge variant={ticket.source?.toLowerCase() ?? "default"}>{SOURCE_LABELS[ticket.source] ?? "Sem origem"}</Badge>
             </div>
             <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{ticket.description}</p>
           </div>
@@ -163,9 +257,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.65fr_0.9fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[3fr_0.95fr]">
         <div className="space-y-6">
-          <Card className="overflow-hidden p-0">
+          <Card className="overflow-hidden p-0 min-h-[860px] flex flex-col shadow-xl">
             <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -174,7 +268,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900">Conversa</h3>
-                    <p className="text-sm text-slate-500">{ticket.messages.length} mensagens · {ticket.requesterName}</p>
+                    <p className="text-sm text-slate-500">{ticket.messages.length} mensagens · {ticket.requesterName || "Solicitante"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
@@ -202,8 +296,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             {activeTab === "conversation" ? (
-              <>
-                <div className="max-h-[640px] space-y-4 overflow-y-auto bg-slate-50/70 p-5">
+              <div className="flex flex-1 flex-col bg-slate-100/80">
+                <div className="flex-1 space-y-4 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
                   {ticket.messages.length > 0 ? (
                     ticket.messages.map((msg) => {
                       const isCustomer = !msg.isFromAgent && !msg.isInternal;
@@ -215,7 +309,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
                       return (
                         <div key={msg.id} className={`flex ${msg.isFromAgent ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[85%] rounded-2xl border px-4 py-3 shadow-sm ${bubbleClass}`}>
+                          <div className={`max-w-[85%] rounded-[28px] border px-5 py-4 shadow-sm ${bubbleClass}`}>
                             <div className="mb-2 flex items-center gap-2 text-xs">
                               <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${msg.isFromAgent ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"}`}>
                                 <User className="h-3.5 w-3.5" />
@@ -247,7 +341,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                   )}
                 </div>
 
-                <div className="border-t border-slate-200 bg-white p-4">
+                <div className="border-t border-slate-200 bg-slate-50 p-4">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -283,14 +377,66 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     <p className="text-xs text-slate-500">
                       {isInternal ? "Visível apenas para a equipe" : "Envia para o canal do cliente"}
                     </p>
-                    <Button onClick={sendMessage} disabled={loading}>
-                      <Send className="mr-1 h-4 w-4" /> Enviar
-                    </Button>
+                    <div className="relative inline-flex" ref={sendMenuRef}>
+                      <div className="inline-flex rounded-lg border border-slate-200 bg-white shadow-sm">
+                        <Button onClick={sendMessage} disabled={loading} className="rounded-r-none">
+                          <Send className="mr-1 h-4 w-4" />
+                          {sendMode === "resolve"
+                            ? "Enviar e marcar como resolvido"
+                            : sendMode === "pendingCustomer"
+                              ? "Enviar e marcar como aguardando cliente"
+                              : "Enviar"}
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setSendMenuOpen((current) => !current)}
+                          className="inline-flex items-center justify-center rounded-r-lg border-l border-slate-200 bg-slate-50 px-3 text-slate-600 transition-colors hover:bg-slate-100"
+                          aria-label="Abrir opções de envio"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {sendMenuOpen && (
+                        <div className="absolute right-0 z-10 mt-2 w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSendMode("default");
+                              setSendMenuOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors ${sendMode === "default" ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            Enviar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSendMode("resolve");
+                              setSendMenuOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors ${sendMode === "resolve" ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            Enviar e marcar como resolvido
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSendMode("pendingCustomer");
+                              setSendMenuOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors ${sendMode === "pendingCustomer" ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                          >
+                            Enviar e marcar como aguardando cliente
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="max-h-[640px] overflow-y-auto bg-slate-50/70 p-5">
+              <div className="flex-1 overflow-y-auto bg-slate-50/70 p-5">
                 <div className="mb-4 flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Linha do tempo do ticket</p>
@@ -346,8 +492,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Status</label>
                 <select
-                  value={ticket.status}
-                  onChange={(e) => updateTicket({ status: e.target.value, agentId: agents[0]?.id })}
+                  value={propsDraft.status}
+                  onChange={(e) => setPropsDraft({ ...propsDraft, status: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   {Object.entries(STATUS_LABELS).map(([k, v]) => (
@@ -358,8 +504,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Prioridade</label>
                 <select
-                  value={ticket.priority}
-                  onChange={(e) => updateTicket({ priority: e.target.value })}
+                  value={propsDraft.prioridade}
+                  onChange={(e) => setPropsDraft({ ...propsDraft, prioridade: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
@@ -370,8 +516,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Departamento</label>
                 <select
-                  value={ticket.department?.id || ""}
-                  onChange={(e) => updateTicket({ departmentId: e.target.value || null })}
+                  value={propsDraft.idDepartamento ?? ""}
+                  onChange={(e) => setPropsDraft({ ...propsDraft, idDepartamento: e.target.value ? Number(e.target.value) : null })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   <option value="">Sem departamento</option>
@@ -383,8 +529,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Agente responsável</label>
                 <select
-                  value={ticket.assignedAgent?.id || ""}
-                  onChange={(e) => updateTicket({ assignedAgentId: e.target.value || null })}
+                  value={propsDraft.idAgenteResponsavel ?? ""}
+                  onChange={(e) => setPropsDraft({ ...propsDraft, idAgenteResponsavel: e.target.value ? Number(e.target.value) : null })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                 >
                   <option value="">Não atribuído</option>
@@ -396,6 +542,23 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex flex-wrap gap-2 pt-2">
                 <Badge variant={ticket.source.toLowerCase()}>{SOURCE_LABELS[ticket.source]}</Badge>
                 <Badge variant={ticket.slaStatus.toLowerCase()}>{SLA_LABELS[ticket.slaStatus]}</Badge>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button
+                  onClick={async () => {
+                    const payload: Record<string, unknown> = {
+                      status: propsDraft.status,
+                      prioridade: propsDraft.prioridade,
+                      idDepartamento: propsDraft.idDepartamento ?? null,
+                      idAgenteResponsavel: propsDraft.idAgenteResponsavel ?? null,
+                      idAgente: currentAgentId,
+                    };
+                    await updateTicket(payload);
+                  }}
+                  disabled={loading}
+                >
+                  Atualizar
+                </Button>
               </div>
             </div>
           </Card>

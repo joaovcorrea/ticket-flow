@@ -99,10 +99,10 @@ export function Sidebar() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-white/5 p-3">
+          {/* <div className="rounded-lg bg-white/5 p-3">
             <p className="text-xs font-medium text-slate-300">WhatsApp conectado</p>
             <p className="mt-1 text-xs text-slate-500">Webhook: /api/webhooks/whatsapp</p>
-          </div>
+          </div> */}
         </div>
       )}
     </aside>

@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { OrigemChamado, StatusChamado, PrioridadeChamado } from "@prisma/client";
 import { applySlaToTicket } from "./sla";
-import { getNextNumeroChamado } from "./tickets";
+import { createWithUniqueNumeroChamado } from "./tickets";
 
 interface IncomingWhatsAppMessage {
   from: string;
@@ -27,34 +27,49 @@ export async function handleWhatsAppMessage(msg: IncomingWhatsAppMessage) {
 
   if (!chamado) {
     chamado = await prisma.chamado.findFirst({
-      where: {
-        telefoneSolicitante: phone,
-        status: { in: [StatusChamado.ABERTO, StatusChamado.PENDENTE, StatusChamado.EM_ANDAMENTO] },
-      },
+      where: { telefoneSolicitante: phone },
       orderBy: { criadoEm: "desc" },
     });
+
+    if (chamado && (chamado.status === StatusChamado.FECHADO || chamado.status === StatusChamado.RESOLVIDO)) {
+      chamado = await prisma.chamado.update({
+        where: { id: chamado.id },
+        data: { status: StatusChamado.REABERTO, reabertoEm: new Date() },
+      });
+
+      await prisma.ticketHistorico.create({
+        data: {
+          idChamado: chamado.id,
+          acao: "REABERTO",
+          detalhes: "Ticket reaberto pelo cliente via WhatsApp",
+        },
+      });
+    } else if (chamado && !(chamado.status === StatusChamado.ABERTO || chamado.status === StatusChamado.PENDENTE || chamado.status === StatusChamado.EM_ANDAMENTO)) {
+      chamado = null as any;
+    }
   }
 
   if (!chamado) {
-    const numeroChamado = await getNextNumeroChamado();
-    chamado = await prisma.chamado.create({
-      data: {
-        numeroChamado,
-        assunto: msg.text.slice(0, 80) || "Nova solicitação via WhatsApp",
-        descricao: msg.text,
-        origem: OrigemChamado.WHATSAPP,
-        prioridade: PrioridadeChamado.MEDIA,
-        nomeSolicitante: msg.name || phone,
-        telefoneSolicitante: phone,
-        idChatWhatsapp: phone,
-        historico: {
-          create: {
-            acao: "TICKET_CREATED",
-            detalhes: "Ticket criado automaticamente via WhatsApp",
+    chamado = await createWithUniqueNumeroChamado(async (numeroChamado) =>
+      prisma.chamado.create({
+        data: {
+          numeroChamado,
+          assunto: msg.text.slice(0, 80) || "Nova solicitação via WhatsApp",
+          descricao: msg.text,
+          origem: OrigemChamado.WHATSAPP,
+          prioridade: PrioridadeChamado.MEDIA,
+          nomeSolicitante: msg.name || phone,
+          telefoneSolicitante: phone,
+          idChatWhatsapp: phone,
+          historico: {
+            create: {
+              acao: "TICKET_CREATED",
+              detalhes: "Ticket criado automaticamente via WhatsApp",
+            },
           },
         },
-      },
-    });
+      })
+    );
 
     await applySlaToTicket(chamado.id, chamado.prioridade, chamado.idDepartamento);
 
