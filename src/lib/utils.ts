@@ -22,7 +22,7 @@ export function formatDuration(minutes: number) {
 export const STATUS_LABELS: Record<string, string> = {
   ABERTO: "Aberto",
   PENDENTE: "Pendente",
-  EM_ANDAMENTO: "Em andamento",
+  EM_ANDAMENTO: "Em Andamento",
   RESOLVIDO: "Resolvido",
   FECHADO: "Fechado",
 };

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatTicketNumber, STATUS_LABELS, PRIORITY_LABELS, SOURCE_LABELS, enumVariant } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock3, GripVertical, Sparkles } from "lucide-react";
+import { Clock3, GripVertical, Sparkles, Search } from "lucide-react";
 
 interface TicketItem {
   id: number;
@@ -50,22 +50,50 @@ export function KanbanBoard({ initialTickets }: KanbanBoardProps) {
   const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null);
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const filteredTickets = useMemo(() => {
+  const term = search.trim().toLowerCase();
 
-  const grouped = useMemo(() => {
-    return STATUS_ORDER.reduce(
-      (acc, status) => {
-        acc[status] = tickets.filter((ticket) => ticket.status === status);
-        return acc;
-      },
-      {} as Record<string, TicketItem[]>
+  if (!term) return tickets;
+
+  return tickets.filter((ticket) => {
+    return (
+      String(ticket.numeroChamado).includes(term) ||
+      ticket.assunto.toLowerCase().includes(term) ||
+      ticket.nomeSolicitante.toLowerCase().includes(term) ||
+      ticket.departamento?.nome.toLowerCase().includes(term) ||
+      ticket.atendenteResponsavel?.nome.toLowerCase().includes(term) ||
+      ticket.status.toLowerCase().includes(term)
     );
-  }, [tickets]);
+  });
+}, [tickets, search]);
 
-  const summary = useMemo(() => {
-    const openCount = tickets.filter((ticket) => ticket.status === "ABERTO" || ticket.status === "PENDENTE").length;
-    const urgentCount = tickets.filter((ticket) => ticket.prioridade === "URGENTE").length;
-    return { openCount, urgentCount };
-  }, [tickets]);
+const grouped = useMemo(() => {
+  return STATUS_ORDER.reduce(
+    (acc, status) => {
+      acc[status] = filteredTickets.filter(
+        (ticket) => ticket.status === status
+      );
+
+      return acc;
+    },
+    {} as Record<string, TicketItem[]>
+  );
+}, [filteredTickets]);
+
+const summary = useMemo(() => {
+  const openCount = filteredTickets.filter(
+    (ticket) =>
+      ticket.status === "ABERTO" ||
+      ticket.status === "PENDENTE"
+  ).length;
+
+  const urgentCount = filteredTickets.filter(
+    (ticket) => ticket.prioridade === "URGENTE"
+  ).length;
+
+  return { openCount, urgentCount };
+}, [filteredTickets]);
 
   async function moveTicket(ticketId: number, status: string) {
     if (!ticketId || !status) return;
@@ -95,38 +123,96 @@ export function KanbanBoard({ initialTickets }: KanbanBoardProps) {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-brand-700">
-            <Sparkles className="h-4 w-4" />
-            <p className="text-sm font-semibold">Painel De Operação</p>
-          </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900">{tickets.length}</p>
-          <p className="mt-1 text-sm text-slate-500">Tickets Em Andamento</p>
+return (
+  <div className="space-y-6">
+
+    {/* Barra de pesquisa */}
+    <div className="flex justify-center">
+      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 transition focus-within:border-brand-500">
+          <Search className="h-4 w-4 text-slate-400" />
+
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Pesquisar por número, assunto, solicitante..."
+            className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+          />
+
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="text-xs font-medium text-slate-500 transition hover:text-slate-700"
+            >
+              Limpar
+            </button>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-amber-600">
-            <Clock3 className="h-4 w-4" />
-            <p className="text-sm font-semibold">Pendentes</p>
-          </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900">{summary.openCount}</p>
-          <p className="mt-1 text-sm text-slate-500">Aguardando Ação</p>
+        <p className="mt-2 text-xs text-slate-500">
+          {filteredTickets.length} ticket(s) encontrado(s)
+        </p>
+      </div>
+    </div>
+
+
+    {/* Cards de resumo */}
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+
+      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-brand-700">
+          <Sparkles className="h-4 w-4" />
+          <p className="text-sm font-semibold">Painel De Operação</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-rose-600">
-            <Clock3 className="h-4 w-4" />
-            <p className="text-sm font-semibold">Urgentes</p>
-          </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900">{summary.urgentCount}</p>
-          <p className="mt-1 text-sm text-slate-500">Alta Prioridade</p>
-        </div>
+        <p className="mt-3 text-3xl font-bold text-slate-900">
+          {tickets.length}
+        </p>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Tickets Em Andamento
+        </p>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-amber-600">
+          <Clock3 className="h-4 w-4" />
+          <p className="text-sm font-semibold">Pendentes</p>
+        </div>
+
+        <p className="mt-3 text-3xl font-bold text-slate-900">
+          {summary.openCount}
+        </p>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Aguardando Ação
+        </p>
+      </div>
+
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-rose-600">
+          <Clock3 className="h-4 w-4" />
+          <p className="text-sm font-semibold">Urgentes</p>
+        </div>
+
+        <p className="mt-3 text-3xl font-bold text-slate-900">
+          {summary.urgentCount}
+        </p>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Alta Prioridade
+        </p>
+      </div>
+
+    </div>
+
+
+    {/* Kanban */}
+    <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm">
         <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">Quadro Kanban</p>
